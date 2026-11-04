@@ -133,6 +133,7 @@ Future<void> claimPhoneAndSaveProfile(PhoneValue p, Map<String, dynamic> profile
           {
             ...profile,
             'phone': p.e164,
+            'phoneKey': p.key,
             'phoneCountry': p.country.code,
             'phoneVerified': false,
           },
