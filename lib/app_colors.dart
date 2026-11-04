@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   static const primary = Color(0xFF075C55); // لون أيقونة HaiApp
-  static const accent = Color(0xFF25D366);
+  static const accent = Color(0xFF075C55); // نفس لون الأيقونة
   static const darkBar = Color(0xFF1F2C34);
 
   static const chatBgLight = Color(0xFFEFEAE2);
