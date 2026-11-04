@@ -12,7 +12,20 @@
           "package_name": "app.haiapp.com"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "82691756431-1u315htr61u6n89gvsupnme8lr3jqmjn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.haiapp.com",
+            "certificate_hash": "2dd8fd4295d401a4d1beea0582649774e7df82ef"
+          }
+        },
+        {
+          "client_id": "82691756431-u41dqee9m12c93qs494cs7e8itmvi20i.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCzAkcOxu54UGL1EgoY2gzZabxX6QpViVM"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "82691756431-u41dqee9m12c93qs494cs7e8itmvi20i.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
