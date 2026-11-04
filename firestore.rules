@@ -4,9 +4,49 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
 
+    // ---- أرقام الموبايل: وثيقة لكل رقم (المفتاح = الرمز الدولي + الرقم بدون +) ----
+    // الرقم يُحجز لحساب واحد فقط، ولا يتغير بعد حفظه.
+
+    // الرقم المكتوب في ملف المستخدم محجوز فعلاً لهذا الحساب (يُفحص بعد العملية نفسها)
+    function phoneClaimedAfter(d) {
+      return d.phone is string
+        && d.phone.matches('^\\+[0-9]{7,15}$')
+        && existsAfter(/databases/$(database)/documents/phones/$(d.phone.replace('+', '')))
+        && getAfter(/databases/$(database)/documents/phones/$(d.phone.replace('+', ''))).data.uid == request.auth.uid;
+    }
+
+    match /phones/{key} {
+      allow get: if signedIn();
+      // البحث عن جهات الاتصال على دفعات (10 كحد أقصى) لمنع سحب كل الأرقام
+      allow list: if signedIn() && request.query.limit <= 10;
+      allow create: if signedIn()
+        && key.matches('^[0-9]{7,15}$')
+        && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.phone == '+' + key;
+      // لا يُحرَّر الرقم إلا عند حذف الحساب نفسه
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && !existsAfter(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
     match /users/{uid} {
-      allow read: if signedIn();
-      allow write: if signedIn() && request.auth.uid == uid;
+      allow get: if signedIn();
+      allow list: if signedIn() && request.query.limit <= 10;
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.get('phoneVerified', false) == false
+        && (!('phone' in request.resource.data) || phoneClaimedAfter(request.resource.data));
+      allow update: if signedIn() && request.auth.uid == uid
+        && (
+          // تعديل عادي لا يمس الرقم
+          !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['phone', 'phoneCountry', 'phoneVerified'])
+          // أو أول حجز للرقم (يُمنع تغييره بعدها)
+          || (!('phone' in resource.data)
+              && request.resource.data.get('phoneVerified', false) == false
+              && phoneClaimedAfter(request.resource.data))
+        );
+      allow delete: if signedIn() && request.auth.uid == uid;
     }
 
     match /chats/{chatId} {
