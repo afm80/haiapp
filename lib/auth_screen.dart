@@ -28,9 +28,11 @@ class _AuthScreenState extends State<AuthScreen> {
         ..setCustomParameters({'prompt': 'select_account'});
       await FirebaseAuth.instance.signInWithProvider(provider);
     } on FirebaseAuthException catch (e) {
-      if (mounted) setState(() => _error = _arabicError(e.code));
-    } catch (_) {
-      if (mounted) setState(() => _error = 'صار خطأ، حاول مرة ثانية');
+      if (mounted) {
+        setState(() => _error = '${_arabicError(e.code)}\n[${e.code}] ${e.message ?? ''}');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = 'صار خطأ، حاول مرة ثانية\n$e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -98,7 +100,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
-                    Text(_error!,
+                    SelectableText(_error!,
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Theme.of(context).colorScheme.error)),
                   ],
