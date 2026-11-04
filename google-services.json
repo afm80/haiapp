@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "82691756431",
+    "project_id": "haiapp80",
+    "storage_bucket": "haiapp80.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:82691756431:android:0706c78ab7aa78c3ed7bfa",
+        "android_client_info": {
+          "package_name": "app.haiapp.com"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCzAkcOxu54UGL1EgoY2gzZabxX6QpViVM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
