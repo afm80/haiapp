@@ -83,6 +83,35 @@ for f in list(main_root.rglob("MainActivity.*")):
             d.rmdir()
             d = d.parent
 
+
+# --- توقيع ثابت: بصمة SHA ثابتة في كل بناء (مطلوبة لتسجيل الدخول بـ Google) ---
+ks = Path("tools/haiapp.keystore").resolve()
+if not ks.exists():
+    sys.exit("::error::ملف tools/haiapp.keystore غير موجود")
+for name, kts in (("build.gradle.kts", True), ("build.gradle", False)):
+    p = android / "app" / name
+    if not p.exists():
+        continue
+    s = p.read_text()
+    if "haiapp.keystore" not in s:
+        if kts:
+            block = ('    signingConfigs {\n        create("haiapp") {\n'
+                     f'            storeFile = file("{ks.as_posix()}")\n'
+                     '            storePassword = "haiapp123"\n            keyAlias = "haiapp"\n'
+                     '            keyPassword = "haiapp123"\n        }\n    }\n')
+            s, n = re.subn(r'(\n\s*buildTypes\s*\{)', "\n" + block + r"\1", s, count=1)
+            s = s.replace('signingConfigs.getByName("debug")', 'signingConfigs.getByName("haiapp")')
+        else:
+            block = ('    signingConfigs {\n        haiapp {\n'
+                     f'            storeFile file("{ks.as_posix()}")\n'
+                     '            storePassword "haiapp123"\n            keyAlias "haiapp"\n'
+                     '            keyPassword "haiapp123"\n        }\n    }\n')
+            s, n = re.subn(r'(\n\s*buildTypes\s*\{)', "\n" + block + r"\1", s, count=1)
+            s = s.replace('signingConfigs.debug', 'signingConfigs.haiapp')
+        if n == 0 or "haiapp" not in s:
+            sys.exit("::error::تعذر ضبط التوقيع في " + name)
+        p.write_text(s)
+
 # --- AndroidManifest: الاسم + الصلاحيات ---
 mf = android / "app" / "src" / "main" / "AndroidManifest.xml"
 s = mf.read_text()
