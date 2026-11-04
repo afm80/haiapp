@@ -92,8 +92,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       if (widget.isEdit && mounted) Navigator.pop(context);
     } on PhoneTakenException {
       if (mounted) setState(() => _error = 'هذا الرقم مسجّل بحساب آخر');
-    } catch (_) {
-      if (mounted) setState(() => _error = 'تعذر الحفظ، حاول مرة ثانية');
+    } on FirebaseException catch (e) {
+      if (mounted) setState(() => _error = 'تعذر الحفظ [${e.code}] ${e.message ?? ''}');
+    } catch (e) {
+      if (mounted) setState(() => _error = 'تعذر الحفظ، حاول مرة ثانية\n$e');
     } finally {
       if (mounted) setState(() => _saving = false);
     }

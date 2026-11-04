@@ -139,9 +139,15 @@ Future<void> claimPhoneAndSaveProfile(PhoneValue p, Map<String, dynamic> profile
           SetOptions(merge: true));
     });
   } on FirebaseException catch (e) {
-    // سباق: حجز شخص آخر الرقم في نفس اللحظة
+    // لا نعتبر الرقم مكرراً إلا إذا تأكدنا أنه محجوز فعلاً لحساب آخر
     if (e.code == 'permission-denied' || e.code == 'aborted') {
-      throw PhoneTakenException();
+      try {
+        final d = await phoneRef.get();
+        final owner = d.data()?['uid'];
+        if (d.exists && owner != uid) throw PhoneTakenException();
+      } on FirebaseException {
+        // تعذرت القراءة: نعرض الخطأ الأصلي بدل رسالة مضللة
+      }
     }
     rethrow;
   }
