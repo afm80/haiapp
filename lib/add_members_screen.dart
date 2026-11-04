@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'contacts_service.dart';
 import 'utils.dart';
 import 'widgets.dart';
 
@@ -15,8 +16,6 @@ class AddMembersScreen extends StatefulWidget {
 }
 
 class _AddMembersScreenState extends State<AddMembersScreen> {
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> _stream =
-      fs.collection('users').snapshots();
   final _selected = <String, String>{};
   bool _saving = false;
 
@@ -34,29 +33,24 @@ class _AddMembersScreenState extends State<AddMembersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('إضافة أعضاء')),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _stream,
-        builder: (context, snap) {
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-          final users = snap.data!.docs
-              .where((d) => !widget.existing.contains(d.id))
-              .where((d) => (d['name'] ?? '').toString().trim().isNotEmpty)
-              .toList();
+      body: ContactsView(
+        builder: (context, all) {
+          final users = all.where((m) => !widget.existing.contains(m.uid)).toList();
           if (users.isEmpty) return const Center(child: Text('لا يوجد مستخدمون لإضافتهم'));
           return ListView(
             children: [
-              for (final u in users)
+              for (final m in users)
                 CheckboxListTile(
-                  value: _selected.containsKey(u.id),
+                  value: _selected.containsKey(m.uid),
                   onChanged: (v) => setState(() {
                     if (v == true) {
-                      _selected[u.id] = u['name'];
+                      _selected[m.uid] = m.name;
                     } else {
-                      _selected.remove(u.id);
+                      _selected.remove(m.uid);
                     }
                   }),
-                  secondary: Avatar(photo: u['photo'] as String?, name: u['name']),
-                  title: Text(u['name']),
+                  secondary: Avatar(photo: m.user['photo'] as String?, name: m.name),
+                  title: Text(m.name),
                 ),
             ],
           );

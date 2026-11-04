@@ -24,7 +24,14 @@ class SettingsScreen extends StatelessWidget {
     if (ok != true) return;
     try {
       final uid = currentUser.uid;
-      await fs.collection('users').doc(uid).delete();
+      final userRef = fs.collection('users').doc(uid);
+      final phone = ((await userRef.get()).data()?['phone'] ?? '').toString();
+      // حذف الملف وتحرير الرقم معاً ليستطيع التسجيل به لاحقاً
+      final batch = fs.batch()..delete(userRef);
+      if (phone.isNotEmpty) {
+        batch.delete(fs.collection('phones').doc(phone.replaceAll('+', '')));
+      }
+      await batch.commit();
       await currentUser.delete();
       if (context.mounted) Navigator.popUntil(context, (r) => r.isFirst);
     } on FirebaseAuthException catch (e) {
@@ -63,9 +70,19 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const Divider(),
+          UserBuilder(
+            uid: user.uid,
+            builder: (_, u) => ListTile(
+              leading: const Icon(Icons.phone_outlined),
+              title: const Text('رقم الموبايل'),
+              subtitle: Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Text((u['phone'] ?? '').toString(), textAlign: TextAlign.start)),
+            ),
+          ),
           ListTile(
             leading: const Icon(Icons.email_outlined),
-            title: const Text('الحساب'),
+            title: const Text('حساب Google'),
             subtitle: Text(user.email ?? ''),
           ),
           ListTile(

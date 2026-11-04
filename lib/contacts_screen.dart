@@ -1,14 +1,14 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'actions.dart';
 import 'app_colors.dart';
+import 'contacts_service.dart';
 import 'new_group_screen.dart';
-import 'utils.dart';
 import 'widgets.dart';
 
 enum ContactsMode { chat, call }
 
+/// جهات الاتصال المسجلة في التطبيق، تُطابق بالرقم مع دفتر هاتف الجوال (مثل واتساب)
 class ContactsScreen extends StatefulWidget {
   final ContactsMode mode;
   const ContactsScreen({super.key, this.mode = ContactsMode.chat});
@@ -18,11 +18,10 @@ class ContactsScreen extends StatefulWidget {
 }
 
 class _ContactsScreenState extends State<ContactsScreen> {
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> _stream =
-      fs.collection('users').snapshots();
   final _search = TextEditingController();
   bool _searching = false;
   String _q = '';
+  int _reload = 0;
 
   @override
   void dispose() {
@@ -57,17 +56,17 @@ class _ContactsScreenState extends State<ContactsScreen> {
               _q = '';
             }),
           ),
+          IconButton(
+            tooltip: 'تحديث جهات الاتصال',
+            icon: const Icon(Icons.refresh),
+            onPressed: () => setState(() => _reload++),
+          ),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _stream,
-        builder: (context, snap) {
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-          final users = snap.data!.docs
-              .where((d) => d.id != currentUser.uid)
-              .where((d) => (d['name'] ?? '').toString().trim().isNotEmpty)
-              .where((d) => _q.isEmpty || d['name'].toString().contains(_q))
-              .toList();
+      body: ContactsView(
+        reload: _reload,
+        builder: (context, all) {
+          final users = all.where((m) => _q.isEmpty || m.name.contains(_q)).toList();
           return ListView(
             children: [
               if (!isCall && _q.isEmpty)
@@ -82,13 +81,19 @@ class _ContactsScreenState extends State<ContactsScreen> {
               if (users.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(32),
-                  child: Center(child: Text('ما فيه مستخدمين بعد')),
+                  child: Center(
+                    child: Text(
+                      'ما لقينا أحد من جهات اتصالك مسجلاً في HaiApp بعد.\n'
+                      'ادعُ أصدقاءك للتسجيل بأرقامهم.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ),
-              for (final u in users)
+              for (final m in users)
                 ListTile(
-                  leading: Avatar(photo: u['photo'] as String?, name: u['name'], radius: 24),
-                  title: Text(u['name']),
-                  subtitle: Text((u.data()['about'] ?? '').toString(),
+                  leading: Avatar(photo: m.user['photo'] as String?, name: m.name, radius: 24),
+                  title: Text(m.name),
+                  subtitle: Text((m.user['about'] ?? '').toString(),
                       maxLines: 1, overflow: TextOverflow.ellipsis),
                   trailing: isCall
                       ? Row(
@@ -97,19 +102,19 @@ class _ContactsScreenState extends State<ContactsScreen> {
                             IconButton(
                               icon: const Icon(Icons.call, color: AppColors.primary),
                               onPressed: () => startCall(context,
-                                  calleeIds: [u.id], title: u['name'], video: false),
+                                  calleeIds: [m.uid], title: m.name, video: false),
                             ),
                             IconButton(
                               icon: const Icon(Icons.videocam, color: AppColors.primary),
                               onPressed: () => startCall(context,
-                                  calleeIds: [u.id], title: u['name'], video: true),
+                                  calleeIds: [m.uid], title: m.name, video: true),
                             ),
                           ],
                         )
                       : null,
                   onTap: isCall
                       ? null
-                      : () => openDirectChat(context, u.id, u['name'], replace: true),
+                      : () => openDirectChat(context, m.uid, m.name, replace: true),
                 ),
             ],
           );

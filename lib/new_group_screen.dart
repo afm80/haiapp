@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 import 'chat_screen.dart';
+import 'contacts_service.dart';
 import 'utils.dart';
 import 'widgets.dart';
 
@@ -14,8 +15,6 @@ class NewGroupScreen extends StatefulWidget {
 }
 
 class _NewGroupScreenState extends State<NewGroupScreen> {
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> _stream =
-      fs.collection('users').snapshots();
   final _name = TextEditingController();
   final _selected = <String, String>{}; // uid -> name
   bool _creating = false;
@@ -100,28 +99,25 @@ class _NewGroupScreenState extends State<NewGroupScreen> {
                 child: Text('إضافة أعضاء', style: TextStyle(fontWeight: FontWeight.bold))),
           ),
           Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _stream,
-              builder: (context, snap) {
-                if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                final users = snap.data!.docs
-                    .where((d) => d.id != currentUser.uid)
-                    .where((d) => (d['name'] ?? '').toString().trim().isNotEmpty)
-                    .toList();
+            child: ContactsView(
+              builder: (context, users) {
+                if (users.isEmpty) {
+                  return const Center(child: Text('لا توجد جهات اتصال مسجلة لإضافتها'));
+                }
                 return ListView(
                   children: [
-                    for (final u in users)
+                    for (final m in users)
                       CheckboxListTile(
-                        value: _selected.containsKey(u.id),
+                        value: _selected.containsKey(m.uid),
                         onChanged: (v) => setState(() {
                           if (v == true) {
-                            _selected[u.id] = u['name'];
+                            _selected[m.uid] = m.name;
                           } else {
-                            _selected.remove(u.id);
+                            _selected.remove(m.uid);
                           }
                         }),
-                        secondary: Avatar(photo: u['photo'] as String?, name: u['name']),
-                        title: Text(u['name']),
+                        secondary: Avatar(photo: m.user['photo'] as String?, name: m.name),
+                        title: Text(m.name),
                       ),
                   ],
                 );

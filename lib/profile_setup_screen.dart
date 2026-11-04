@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'app_colors.dart';
+import 'phone.dart';
 import 'utils.dart';
 import 'widgets.dart';
 
@@ -22,6 +23,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _name = TextEditingController();
   final _about = TextEditingController(text: 'مرحباً! أنا أستخدم HaiApp');
   String? _photo;
+  PhoneValue? _phone; // الرقم المُدخل (تسجيل جديد)
+  String? _savedPhone; // الرقم المحفوظ سابقاً (للعرض فقط ولا يمكن تغييره)
   bool _saving = false;
   String? _error;
 
@@ -40,6 +43,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       _name.text = d['name'] ?? '';
       _about.text = d['about'] ?? '';
       _photo = d['photo'] as String?;
+      final ph = (d['phone'] ?? '').toString();
+      _savedPhone = ph.isEmpty ? null : ph;
     });
   }
 
@@ -53,8 +58,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   Future<void> _save() async {
     final name = _name.text.trim();
-    if (name.isEmpty) {
-      setState(() => _error = 'اكتب اسمك');
+    if (name.length < 2) {
+      setState(() => _error = 'اكتب اسمك (حرفان على الأقل)');
+      return;
+    }
+    // الرقم إلزامي في التسجيل الأول، ولا يتغير بعد حفظه
+    final needsPhone = _savedPhone == null;
+    final phone = _phone;
+    if (needsPhone && (phone == null || !phone.valid)) {
+      setState(() => _error = 'اكتب رقم موبايلك مع اختيار رمز الدولة');
       return;
     }
     setState(() {
@@ -63,15 +75,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     });
     try {
       await currentUser.updateDisplayName(name);
-      await fs.collection('users').doc(currentUser.uid).set({
+      final profile = <String, dynamic>{
         'name': name,
         'about': _about.text.trim(),
         'photo': _photo ?? '',
         'email': currentUser.email,
         'online': true,
         'lastSeen': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
+      if (needsPhone) {
+        // يحجز الرقم ويحفظ الملف في عملية واحدة، ويرفض الرقم المكرر
+        await claimPhoneAndSaveProfile(phone!, profile);
+      } else {
+        await fs.collection('users').doc(currentUser.uid).set(profile, SetOptions(merge: true));
+      }
       if (widget.isEdit && mounted) Navigator.pop(context);
+    } on PhoneTakenException {
+      if (mounted) setState(() => _error = 'هذا الرقم مسجّل بحساب آخر');
     } catch (_) {
       if (mounted) setState(() => _error = 'تعذر الحفظ، حاول مرة ثانية');
     } finally {
@@ -132,6 +152,21 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   prefixIcon: Icon(Icons.info_outline),
                   border: OutlineInputBorder()),
             ),
+            const SizedBox(height: 12),
+            if (_savedPhone != null)
+              InputDecorator(
+                decoration: const InputDecoration(
+                    labelText: 'رقم الموبايل',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                    border: OutlineInputBorder()),
+                child: Directionality(
+                    textDirection: TextDirection.ltr, child: Text(_savedPhone!)),
+              )
+            else
+              PhoneInput(
+                enabled: !_saving,
+                onChanged: (v) => _phone = v,
+              ),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),

@@ -76,7 +76,7 @@ class SplashScreen extends StatelessWidget {
 }
 
 /// 1) غير مسجل: ترحيب ← تسجيل
-/// 2) مسجل بدون ملف شخصي: إعداد الملف
+/// 2) مسجل بدون ملف شخصي أو بدون رقم موبايل: إعداد الملف
 /// 3) مسجل وجاهز: الشاشة الرئيسية
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -135,7 +135,8 @@ class _ProfileGateState extends State<ProfileGate> {
         if (!snap.hasData) return const SplashScreen();
         final d = snap.data!.data();
         final hasName = (d?['name'] ?? '').toString().trim().isNotEmpty;
-        return hasName ? const HomeScreen() : const ProfileSetupScreen();
+        final hasPhone = (d?['phone'] ?? '').toString().trim().isNotEmpty;
+        return (hasName && hasPhone) ? const HomeScreen() : const ProfileSetupScreen();
       },
     );
   }
