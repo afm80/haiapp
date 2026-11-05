@@ -54,6 +54,8 @@ class _CallScreenState extends State<CallScreen> {
       engine.registerEventHandler(RtcEngineEventHandler(
         onJoinChannelSuccess: (conn, elapsed) {
           if (!mounted) return;
+          // مسار الصوت لا يُضبط إلا بعد الانضمام للقناة
+          engine.setEnableSpeakerphone(_speaker).catchError((_) {});
           setState(() => _joined = true);
           _timer ??= Timer.periodic(const Duration(seconds: 1), (_) {
             if (mounted && _remotes.isNotEmpty) setState(() => _seconds++);
@@ -74,7 +76,6 @@ class _CallScreenState extends State<CallScreen> {
         await engine.enableVideo();
         await engine.startPreview();
       }
-      await engine.setEnableSpeakerphone(_video);
       _speaker = _video;
       await engine.joinChannel(
         token: '',
