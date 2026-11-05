@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'blocked_screen.dart';
 import 'profile_setup_screen.dart';
 import 'utils.dart';
+import 'verify_config.dart';
 import 'verify_phone_screen.dart';
 import 'widgets.dart';
 
@@ -86,7 +87,7 @@ class SettingsScreen extends StatelessWidget {
                     ? const Tooltip(
                         message: 'موثّق',
                         child: Icon(Icons.verified, color: Color(0xFF1DA1F2)))
-                    : (pv == null
+                    : (pv == null || (kTelegramBot.isEmpty && kWhatsAppNumber.isEmpty)
                         ? null
                         : TextButton(
                             onPressed: () => Navigator.push(
