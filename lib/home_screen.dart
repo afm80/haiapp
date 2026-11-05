@@ -5,12 +5,12 @@ import 'package:flutter/material.dart';
 
 import 'actions.dart';
 import 'app_colors.dart';
-import 'call_screen.dart';
 import 'calls_tab.dart';
 import 'chat_actions.dart';
 import 'chats_tab.dart';
 import 'contacts_screen.dart';
 import 'contacts_service.dart';
+import 'incoming_call_screen.dart';
 import 'new_group_screen.dart';
 import 'settings_screen.dart';
 import 'status_tab.dart';
@@ -80,10 +80,11 @@ class _HomeScreenState extends State<HomeScreen>
         final fresh =
             ts != null && DateTime.now().difference(ts.toDate()).inSeconds < 40;
         if (d['status'] == 'ringing' && fresh && mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (_) => IncomingCallDialog(callId: ch.doc.id, data: d),
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                fullscreenDialog: true,
+                builder: (_) => IncomingCallScreen(callId: ch.doc.id, data: d)),
           );
         }
       }
@@ -281,74 +282,6 @@ class _HomeScreenState extends State<HomeScreen>
         ],
       ),
       floatingActionButton: _fab(),
-    );
-  }
-}
-
-class IncomingCallDialog extends StatefulWidget {
-  final String callId;
-  final Map<String, dynamic> data;
-  const IncomingCallDialog({super.key, required this.callId, required this.data});
-
-  @override
-  State<IncomingCallDialog> createState() => _IncomingCallDialogState();
-}
-
-class _IncomingCallDialogState extends State<IncomingCallDialog> {
-  Timer? _timeout;
-
-  DocumentReference<Map<String, dynamic>> get _ref =>
-      fs.collection('calls').doc(widget.callId);
-
-  @override
-  void initState() {
-    super.initState();
-    _timeout = Timer(const Duration(seconds: 40), () {
-      if (!mounted) return;
-      _ref.update({'status': 'missed'}).catchError((_) {});
-      Navigator.pop(context);
-    });
-  }
-
-  @override
-  void dispose() {
-    _timeout?.cancel();
-    super.dispose();
-  }
-
-  void _answer(bool accept) {
-    _timeout?.cancel();
-    _ref.update({'status': accept ? 'answered' : 'declined'}).catchError((_) {});
-    final nav = Navigator.of(context);
-    nav.pop();
-    if (accept) {
-      nav.push(MaterialPageRoute(
-          builder: (_) => CallScreen(
-              room: widget.data['room'] as String,
-              video: widget.data['type'] == 'video',
-              title: (widget.data['callerName'] ?? '').toString())));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final video = widget.data['type'] == 'video';
-    final isGroupCall = (widget.data['calleeIds'] as List).length > 1;
-    return AlertDialog(
-      title: Text(video ? 'مكالمة فيديو واردة' : 'مكالمة صوتية واردة'),
-      content: Text(
-          '${widget.data['callerName'] ?? ''}${isGroupCall ? ' (مجموعة)' : ''} يتصل بك'),
-      actions: [
-        TextButton(
-          onPressed: () => _answer(false),
-          child: Text('رفض', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: AppColors.accent),
-          onPressed: () => _answer(true),
-          child: const Text('قبول'),
-        ),
-      ],
     );
   }
 }

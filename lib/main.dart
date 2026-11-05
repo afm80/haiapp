@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app_colors.dart';
@@ -22,6 +23,7 @@ ThemeData _theme(Brightness b) {
   final light = b == Brightness.light;
   return ThemeData(
     useMaterial3: true,
+    textTheme: GoogleFonts.cairoTextTheme(ThemeData(brightness: b).textTheme),
     colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary, brightness: b),
     appBarTheme: AppBarTheme(
       backgroundColor: light ? AppColors.primary : AppColors.darkBar,

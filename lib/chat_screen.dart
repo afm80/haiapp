@@ -15,6 +15,7 @@ import 'chat_actions.dart';
 import 'contacts_service.dart';
 import 'app_colors.dart';
 import 'audio_bubble.dart';
+import 'chat_wallpaper.dart';
 import 'forward_screen.dart';
 import 'info_screen.dart';
 import 'utils.dart';
@@ -42,6 +43,8 @@ class _ChatScreenState extends State<ChatScreen> {
       _msgsRef.orderBy('createdAt', descending: true).limit(100).snapshots();
 
   Map<String, dynamic> _chat = {};
+  final _scroll = ScrollController();
+  final _showDown = ValueNotifier<bool>(false);
   String? _replyText;
   String? _editingId;
   bool _sendingMedia = false;
@@ -64,6 +67,10 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _chatRef.update({'unread.$_uid': 0}).catchError((_) {});
+    _scroll.addListener(() {
+      final far = _scroll.hasClients && _scroll.offset > 400;
+      if (far != _showDown.value) _showDown.value = far;
+    });
     _ctrl.addListener(() {
       final h = _ctrl.text.trim().isNotEmpty;
       if (h != _hasText) setState(() => _hasText = h);
@@ -78,6 +85,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _recorder.dispose();
     _ctrl.dispose();
     _searchCtrl.dispose();
+    _scroll.dispose();
+    _showDown.dispose();
     super.dispose();
   }
 
@@ -399,8 +408,8 @@ class _ChatScreenState extends State<ChatScreen> {
         }
         return Scaffold(
           appBar: _appBar(context),
-          body: Container(
-            color: dark ? AppColors.chatBgDark : AppColors.chatBgLight,
+          body: ChatWallpaper(
+            dark: dark,
             child: Column(
               children: [
                 Expanded(child: _messages(context)),
@@ -538,6 +547,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _messages(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: _msgStream,
       builder: (context, snap) {
@@ -563,7 +573,8 @@ class _ChatScreenState extends State<ChatScreen> {
         if (docs.isEmpty) {
           return Center(child: Text(_searching ? 'لا نتائج' : 'ابدأ المحادثة 👋'));
         }
-        return ListView.builder(
+        final list = ListView.builder(
+          controller: _scroll,
           reverse: true,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           itemCount: docs.length,
@@ -576,12 +587,65 @@ class _ChatScreenState extends State<ChatScreen> {
             return Column(
               children: [
                 if (showDay) _dayChip(context, dayLabel(dt(docs[i]))),
-                _bubble(context, docs[i], tail: tail),
+                _swipeToReply(context, docs[i], _bubble(context, docs[i], tail: tail)),
               ],
             );
           },
         );
+        return Stack(children: [
+          list,
+          Positioned.directional(
+            textDirection: Directionality.of(context),
+            end: 14,
+            bottom: 10,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _showDown,
+              builder: (_, show, __) => AnimatedScale(
+                scale: show ? 1 : 0,
+                duration: const Duration(milliseconds: 150),
+                child: FloatingActionButton.small(
+                  heroTag: null,
+                  elevation: 2,
+                  backgroundColor: dark ? const Color(0xFF202C33) : Colors.white,
+                  foregroundColor: dark ? Colors.white70 : const Color(0xFF54656F),
+                  onPressed: () => _scroll.animateTo(0,
+                      duration: const Duration(milliseconds: 250), curve: Curves.easeOut),
+                  child: const Icon(Icons.keyboard_arrow_down),
+                ),
+              ),
+            ),
+          ),
+        ]);
       },
+    );
+  }
+
+  /// اسحب الرسالة جانباً للرد عليها
+  Widget _swipeToReply(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> d, Widget child) {
+    final icon = Container(
+      alignment: AlignmentDirectional.center,
+      width: 56,
+      child: CircleAvatar(
+        radius: 16,
+        backgroundColor: Colors.black12,
+        child: Icon(Icons.reply, size: 18, color: Theme.of(context).hintColor),
+      ),
+    );
+    return Dismissible(
+      key: ValueKey('sw_${d.id}'),
+      direction: DismissDirection.horizontal,
+      dismissThresholds: const {DismissDirection.startToEnd: 0.18, DismissDirection.endToStart: 0.18},
+      background: Align(alignment: AlignmentDirectional.centerStart, child: icon),
+      secondaryBackground: Align(alignment: AlignmentDirectional.centerEnd, child: icon),
+      confirmDismiss: (_) async {
+        HapticFeedback.selectionClick();
+        setState(() {
+          _replyText = previewOf(d.data());
+          _editingId = null;
+        });
+        return false;
+      },
+      child: child,
     );
   }
 
