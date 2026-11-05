@@ -10,7 +10,6 @@ import 'auth_screen.dart';
 import 'home_screen.dart';
 import 'profile_setup_screen.dart';
 import 'utils.dart';
-import 'welcome_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -75,7 +74,7 @@ class SplashScreen extends StatelessWidget {
   }
 }
 
-/// 1) غير مسجل: ترحيب ← تسجيل
+/// 1) غير مسجل: شاشة واحدة (ترحيب + دخول Google)
 /// 2) مسجل بدون ملف شخصي أو بدون رقم موبايل: إعداد الملف
 /// 3) مسجل وجاهز: الشاشة الرئيسية
 class AuthGate extends StatelessWidget {
@@ -97,22 +96,11 @@ class AuthGate extends StatelessWidget {
   }
 }
 
-class LoggedOutFlow extends StatefulWidget {
+class LoggedOutFlow extends StatelessWidget {
   const LoggedOutFlow({super.key});
 
   @override
-  State<LoggedOutFlow> createState() => _LoggedOutFlowState();
-}
-
-class _LoggedOutFlowState extends State<LoggedOutFlow> {
-  bool _accepted = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return _accepted
-        ? const AuthScreen()
-        : WelcomeScreen(onContinue: () => setState(() => _accepted = true));
-  }
+  Widget build(BuildContext context) => const AuthScreen();
 }
 
 class ProfileGate extends StatefulWidget {

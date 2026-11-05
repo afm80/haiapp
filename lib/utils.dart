@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
 
 import 'contacts_service.dart';
@@ -73,6 +74,9 @@ Future<void> setPresence(bool online) async {
 Future<void> signOutUser() async {
   await setPresence(false);
   ContactsService.clear();
+  try {
+    await GoogleSignIn().signOut();
+  } catch (_) {}
   await FirebaseAuth.instance.signOut();
 }
 
