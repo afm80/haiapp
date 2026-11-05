@@ -141,29 +141,42 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _attachSheet() {
+    Widget item(IconData icon, Color color, String label, VoidCallback onTap) => InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircleAvatar(
+                    radius: 28,
+                    backgroundColor: color,
+                    child: Icon(icon, color: Colors.white, size: 26)),
+                const SizedBox(height: 6),
+                Text(label, style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+        );
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('المعرض'),
-              onTap: () {
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              item(Icons.photo_library, const Color(0xFFAC44CF), 'المعرض', () {
                 Navigator.pop(ctx);
                 _pickImage(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('الكاميرا'),
-              onTap: () {
+              }),
+              item(Icons.photo_camera, const Color(0xFFD3396D), 'الكاميرا', () {
                 Navigator.pop(ctx);
                 _pickImage(ImageSource.camera);
-              },
-            ),
-          ],
+              }),
+            ],
+          ),
         ),
       ),
     );
@@ -554,14 +567,18 @@ class _ChatScreenState extends State<ChatScreen> {
         }
         return ListView.builder(
           reverse: true,
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           itemCount: docs.length,
           itemBuilder: (context, i) {
             final showDay = i == docs.length - 1 || !sameDay(dt(docs[i]), dt(docs[i + 1]));
+            final older = i + 1 < docs.length ? docs[i + 1] : null;
+            final tail = older == null ||
+                older.data()['senderId'] != docs[i].data()['senderId'] ||
+                !sameDay(dt(docs[i]), dt(older));
             return Column(
               children: [
                 if (showDay) _dayChip(context, dayLabel(dt(docs[i]))),
-                _bubble(context, docs[i]),
+                _bubble(context, docs[i], tail: tail),
               ],
             );
           },
@@ -573,13 +590,16 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _dayChip(BuildContext context, String label) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: dark ? AppColors.otherDark : Colors.white70,
+        color: dark ? const Color(0xFF182229) : Colors.white,
         borderRadius: BorderRadius.circular(8),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 1, offset: Offset(0, 1))],
       ),
-      child: Text(label, style: const TextStyle(fontSize: 12)),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 12.5, color: dark ? const Color(0xFF8696A0) : const Color(0xFF54656F))),
     );
   }
 
@@ -591,7 +611,8 @@ class _ChatScreenState extends State<ChatScreen> {
     return colors[uid.hashCode.abs() % colors.length];
   }
 
-  Widget _bubble(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> d) {
+  Widget _bubble(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> d,
+      {bool tail = true}) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final data = d.data();
@@ -601,129 +622,221 @@ class _ChatScreenState extends State<ChatScreen> {
     final reply = data['replyText'] as String?;
     final type = (data['type'] ?? 'text') as String;
     final isImage = type == 'image';
+    final isAudio = type == 'audio';
     final readBy = List<String>.from(data['readBy'] ?? const []);
     final readAll = _others.isNotEmpty && _others.every(readBy.contains);
     final time = ts == null ? '' : hhmm(ts.toDate());
     final reactions = Map<String, dynamic>.from(data['reactions'] ?? {});
+    final edited = data['edited'] == true;
+    final metaColor = dark ? const Color(0xFF8696A0) : const Color(0xFF667781);
 
-    Widget content;
-    if (isImage) {
-      content = _Base64Image(data['image'] as String);
-    } else if (type == 'audio') {
-      content = AudioBubble(
-          data: data['audio'] as String, seconds: (data['duration'] ?? 0) as int);
-    } else {
-      content = Text(data['text'] ?? '', style: const TextStyle(fontSize: 15.5));
+    // الوقت وعلامات القراءة داخل الفقاعة مثل واتساب
+    Widget meta({Color? color}) {
+      final c = color ?? metaColor;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (edited) Text('معدّلة ', style: TextStyle(fontSize: 11, color: c)),
+          Text(time, style: TextStyle(fontSize: 11, color: c)),
+          if (mine) ...[
+            const SizedBox(width: 3),
+            Icon(
+              ts == null ? Icons.access_time : (readAll ? Icons.done_all : Icons.done),
+              size: 16,
+              color: readAll ? const Color(0xFF53BDEB) : c,
+            ),
+          ],
+        ],
+      );
     }
 
-    return Align(
-      alignment: mine ? AlignmentDirectional.centerStart : AlignmentDirectional.centerEnd,
-      child: GestureDetector(
-        onLongPress: () => _options(d),
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 2),
-          padding: EdgeInsets.all(isImage ? 4 : 8),
-          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-          decoration: BoxDecoration(
-            color: mine
-                ? (dark ? AppColors.mineDark : AppColors.mineLight)
-                : (dark ? AppColors.otherDark : AppColors.otherLight),
-            borderRadius: BorderRadius.circular(10),
+    Widget body;
+    if (isImage) {
+      body = Stack(
+        children: [
+          _Base64Image(data['image'] as String),
+          Positioned.directional(
+            textDirection: Directionality.of(context),
+            end: 6,
+            bottom: 5,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                  color: Colors.black45, borderRadius: BorderRadius.circular(10)),
+              child: meta(color: Colors.white),
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (data['forwarded'] == true)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Text('↪ محوّلة',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontStyle: FontStyle.italic,
-                          color: Theme.of(context).hintColor)),
-                ),
-              if (_isGroup && !mine && senderId != null)
-                Padding(
-                  padding: EdgeInsets.fromLTRB(isImage ? 6 : 0, isImage ? 2 : 0, 0, 2),
-                  child: Text((data['senderName'] ?? '').toString(),
-                      style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.bold,
-                          color: _nameColor(senderId))),
-                ),
-              if (reply != null)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    border: BorderDirectional(
-                        start: BorderSide(color: scheme.primary, width: 3)),
-                    color: scheme.primary.withOpacity(0.08),
-                  ),
-                  child: Text(reply,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall),
-                ),
-              content,
-              const SizedBox(height: 2),
+        ],
+      );
+    } else if (isAudio) {
+      body = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          AudioBubble(data: data['audio'] as String, seconds: (data['duration'] ?? 0) as int),
+          meta(),
+        ],
+      );
+    } else {
+      body = Wrap(
+        alignment: WrapAlignment.end,
+        crossAxisAlignment: WrapCrossAlignment.end,
+        children: [
+          Text(data['text'] ?? '', style: const TextStyle(fontSize: 16, height: 1.3)),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 10, top: 4),
+            child: meta(),
+          ),
+        ],
+      );
+    }
+
+    const r = Radius.circular(12);
+    final shape = BorderRadiusDirectional.only(
+      topStart: (tail && mine) ? Radius.zero : r,
+      topEnd: (tail && !mine) ? Radius.zero : r,
+      bottomStart: r,
+      bottomEnd: r,
+    );
+
+    final bubble = GestureDetector(
+      onLongPress: () => _options(d),
+      child: Container(
+        margin: EdgeInsets.only(top: tail ? 6 : 1.5, bottom: 1.5),
+        padding: isImage
+            ? const EdgeInsets.all(3)
+            : const EdgeInsetsDirectional.fromSTEB(9, 6, 9, 5),
+        constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.8, minWidth: isAudio ? 240 : 0),
+        decoration: BoxDecoration(
+          color: mine
+              ? (dark ? AppColors.mineDark : AppColors.mineLight)
+              : (dark ? AppColors.otherDark : AppColors.otherLight),
+          borderRadius: shape,
+          boxShadow: dark
+              ? null
+              : const [BoxShadow(color: Colors.black12, blurRadius: 0.5, offset: Offset(0, 1))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (data['forwarded'] == true)
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: isImage ? 6 : 0),
+                padding: EdgeInsets.only(bottom: 3, left: isImage ? 6 : 0, right: isImage ? 6 : 0),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (reactions.isNotEmpty)
-                      Container(
-                        margin: const EdgeInsetsDirectional.only(end: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: scheme.surface.withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${reactions.values.toSet().join(' ')}${reactions.length > 1 ? ' ${reactions.length}' : ''}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    Text(
-                      '${data['edited'] == true ? 'معدّلة · ' : ''}$time',
-                      style: TextStyle(fontSize: 11, color: Theme.of(context).hintColor),
-                    ),
-                    if (mine) ...[
-                      const SizedBox(width: 4),
-                      Icon(
-                        ts == null
-                            ? Icons.access_time
-                            : (readAll ? Icons.done_all : Icons.done),
-                        size: 15,
-                        color: readAll ? const Color(0xFF34B7F1) : Theme.of(context).hintColor,
-                      ),
-                    ],
+                    Icon(Icons.forward, size: 14, color: metaColor),
+                    const SizedBox(width: 4),
+                    Text('محوّلة',
+                        style: TextStyle(
+                            fontSize: 12, fontStyle: FontStyle.italic, color: metaColor)),
                   ],
                 ),
               ),
-            ],
-          ),
+            if (_isGroup && !mine && senderId != null && tail)
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(isImage ? 6 : 0, isImage ? 2 : 0, 0, 2),
+                child: Text((data['senderName'] ?? '').toString(),
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _nameColor(senderId))),
+              ),
+            if (reply != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsetsDirectional.fromSTEB(8, 5, 8, 5),
+                    decoration: BoxDecoration(
+                      border: BorderDirectional(
+                          start: BorderSide(color: scheme.primary, width: 4)),
+                      color: dark ? Colors.black26 : Colors.black.withAlpha(15),
+                    ),
+                    child: Text(reply,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13, color: metaColor)),
+                  ),
+                ),
+              ),
+            body,
+          ],
         ),
+      ),
+    );
+
+    return Align(
+      alignment: mine ? AlignmentDirectional.centerStart : AlignmentDirectional.centerEnd,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: mine ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+        children: [
+          bubble,
+          if (reactions.isNotEmpty)
+            Transform.translate(
+              offset: const Offset(0, -8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: dark ? const Color(0xFF202C33) : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black26, blurRadius: 1, offset: Offset(0, 1))
+                  ],
+                ),
+                child: Text(
+                  '${reactions.values.toSet().join(' ')}${reactions.length > 1 ? ' ${reactions.length}' : ''}',
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 
   Widget _replyBar(BuildContext context) {
     if (_replyText == null && _editingId == null) return const SizedBox.shrink();
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      color: dark ? const Color(0xFF1F2C34) : const Color(0xFFF0F2F5),
+      padding: const EdgeInsets.fromLTRB(10, 8, 4, 4),
       child: Row(
         children: [
-          Icon(_editingId != null ? Icons.edit : Icons.reply, size: 18),
-          const SizedBox(width: 8),
           Expanded(
-            child: Text(_editingId != null ? 'تعديل الرسالة' : _replyText!,
-                maxLines: 1, overflow: TextOverflow.ellipsis),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsetsDirectional.fromSTEB(10, 6, 10, 6),
+                decoration: BoxDecoration(
+                  color: dark ? const Color(0xFF16222A) : Colors.white,
+                  border: BorderDirectional(
+                      start: BorderSide(color: Theme.of(context).colorScheme.primary, width: 4)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_editingId != null ? 'تعديل الرسالة' : 'رد',
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context).colorScheme.primary)),
+                    if (_editingId == null)
+                      Text(_replyText!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+            ),
           ),
           IconButton(
-            icon: const Icon(Icons.close, size: 18),
+            icon: const Icon(Icons.close, size: 20),
             onPressed: () => setState(() {
               if (_editingId != null) _ctrl.clear();
               _replyText = null;
@@ -833,7 +946,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         maxLines: 5,
                         textInputAction: TextInputAction.newline,
                         decoration: const InputDecoration(
-                          hintText: 'اكتب رسالة',
+                          hintText: 'رسالة',
                           border: InputBorder.none,
                           contentPadding:
                               EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -904,8 +1017,12 @@ class _Base64ImageState extends State<_Base64Image> {
         ),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.memory(_bytes, fit: BoxFit.cover, gaplessPlayback: true),
+        borderRadius: BorderRadius.circular(9),
+        child: ConstrainedBox(
+          constraints:
+              const BoxConstraints(minWidth: 170, maxWidth: 260, maxHeight: 340),
+          child: Image.memory(_bytes, fit: BoxFit.cover, gaplessPlayback: true),
+        ),
       ),
     );
   }
