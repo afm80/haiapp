@@ -126,4 +126,48 @@ perms = ('    <uses-permission android:name="android.permission.INTERNET"/>\n'
 if "android.permission.INTERNET" not in s.split("<application")[0]:
     s = s.replace("<application", perms + "    <application", 1)
 mf.write_text(s)
+
+# --- رفع compileSdk للإضافات القديمة (مثل agora_rtc_engine المبنية على android-31) ---
+KTS_FIX = """
+// HAIAPP_SDK_FIX
+subprojects {
+    val haiFix = Action<Project> {
+        val ext = extensions.findByName("android")
+        if (ext != null) {
+            val cur = ext.javaClass.methods.firstOrNull { it.name == "getCompileSdk" && it.parameterCount == 0 }?.invoke(ext) as? Int
+            if (cur != null && cur < 35) {
+                val m = ext.javaClass.methods.firstOrNull { it.name == "setCompileSdk" && it.parameterCount == 1 }
+                if (m != null) {
+                    m.invoke(ext, 35)
+                } else {
+                    ext.javaClass.methods.firstOrNull { it.name == "compileSdkVersion" && it.parameterCount == 1 && it.parameterTypes[0] == Int::class.javaPrimitiveType }?.invoke(ext, 35)
+                }
+            }
+        }
+    }
+    if (state.executed) haiFix.execute(this) else afterEvaluate(haiFix)
+}
+"""
+GROOVY_FIX = """
+// HAIAPP_SDK_FIX
+subprojects {
+    def haiFix = { Project pr ->
+        def ext = pr.extensions.findByName("android")
+        if (ext != null) {
+            def cur = null
+            try { cur = ext.compileSdk } catch (Throwable ignored) {}
+            if (cur != null && cur < 35) { ext.compileSdk = 35 }
+        }
+    }
+    if (project.state.executed) { haiFix(project) } else { project.afterEvaluate { haiFix(it) } }
+}
+"""
+for name, fix in (("build.gradle.kts", KTS_FIX), ("build.gradle", GROOVY_FIX)):
+    p = android / name
+    if p.exists():
+        t = p.read_text()
+        if "HAIAPP_SDK_FIX" not in t:
+            p.write_text(t + fix)
+        break
+
 print("patch OK")
