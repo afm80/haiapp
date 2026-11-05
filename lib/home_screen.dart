@@ -46,6 +46,12 @@ class _HomeScreenState extends State<HomeScreen>
     });
     // يطلب إذن جهات الاتصال مرة واحدة ويحمّل أسماءها لعرضها في المحادثات
     unawaited(ContactsService.load().then((_) {}, onError: (_) {}));
+    // خصوصية: نحذف الإيميل من ملفك الشخصي في Firestore إن كان محفوظاً من نسخ سابقة
+    fs
+        .collection('users')
+        .doc(currentUser.uid)
+        .update({'email': FieldValue.delete()})
+        .catchError((_) {});
     setPresence(true);
     _heartbeat = Timer.periodic(const Duration(seconds: 60), (_) {
       if (_foreground) setPresence(true);

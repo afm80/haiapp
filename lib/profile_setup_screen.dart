@@ -79,7 +79,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         'name': name,
         'about': _about.text.trim(),
         'photo': _photo ?? '',
-        'email': currentUser.email,
         'online': true,
         'lastSeen': FieldValue.serverTimestamp(),
       };
