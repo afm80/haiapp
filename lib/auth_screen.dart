@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'app_colors.dart';
+import 'google_config.dart';
 
 /// شاشة واحدة: ترحيب + الموافقة + الدخول بحساب Google.
 /// الدخول يتم بنافذة اختيار الحساب الأصلية داخل التطبيق (بدون فتح المتصفح).
@@ -21,7 +22,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   /// يرجع false إذا ألغى المستخدم
   Future<bool> _native() async {
-    final gs = GoogleSignIn(scopes: ['email']);
+    final gs = GoogleSignIn(scopes: ['email'], serverClientId: kGoogleWebClientId);
     await gs.signOut(); // ليظهر اختيار الحساب في كل مرة
     final acc = await gs.signIn();
     if (acc == null) return false;
