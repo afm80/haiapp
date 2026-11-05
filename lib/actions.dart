@@ -28,8 +28,12 @@ Future<void> openDirectChat(
 
 /// المكالمات تتم عبر Jitsi Meet المجاني (مفتوح المصدر)
 Future<void> joinCall(String room, bool video) async {
-  final url = Uri.parse(
-      'https://meet.jit.si/$room#config.startWithVideoMuted=${!video}&config.prejoinPageEnabled=false');
+  // disableDeepLinking: يتخطى صفحة "Join in app / Join in browser" ويدخل الاجتماع مباشرة
+  final url = Uri.parse('https://meet.jit.si/$room'
+      '#config.startWithVideoMuted=${!video}'
+      '&config.startWithAudioMuted=false'
+      '&config.prejoinPageEnabled=false'
+      '&config.disableDeepLinking=true');
   await launchUrl(url, mode: LaunchMode.externalApplication);
 }
 
