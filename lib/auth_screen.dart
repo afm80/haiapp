@@ -1,12 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'app_colors.dart';
 
 /// شاشة واحدة: ترحيب + الموافقة + الدخول بحساب Google.
 /// الدخول يتم بنافذة اختيار الحساب الأصلية داخل التطبيق (بدون فتح المتصفح).
-/// إن تعذّر ذلك على الجهاز نرجع تلقائياً للدخول عبر المتصفح.
+/// عند حدوث خطأ يظهر رمزه على الشاشة (بدون فتح المتصفح).
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -33,29 +34,19 @@ class _AuthScreenState extends State<AuthScreen> {
     return true;
   }
 
-  Future<void> _viaBrowser() async {
-    final provider = GoogleAuthProvider()
-      ..addScope('email')
-      ..setCustomParameters({'prompt': 'select_account'});
-    await FirebaseAuth.instance.signInWithProvider(provider);
-  }
-
   Future<void> _google() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      try {
-        await _native();
-      } catch (_) {
-        // الدخول الأصلي غير متاح (إعداد Firebase أو خدمات Google): نجرّب المتصفح
-        await _viaBrowser();
-      }
+      await _native();
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         setState(() => _error = '${_arabicError(e.code)}\n[${e.code}] ${e.message ?? ''}');
       }
+    } on PlatformException catch (e) {
+      if (mounted) setState(() => _error = 'تعذر تسجيل الدخول\n[${e.code}] ${e.message ?? ''}');
     } catch (e) {
       if (mounted) setState(() => _error = 'صار خطأ، حاول مرة ثانية\n$e');
     } finally {
