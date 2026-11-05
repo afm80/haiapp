@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'blocked_screen.dart';
 import 'profile_setup_screen.dart';
+import 'username_screen.dart';
 import 'utils.dart';
 import 'verify_config.dart';
 import 'verify_phone_screen.dart';
@@ -31,7 +32,9 @@ class SettingsScreen extends StatelessWidget {
       final userRef = fs.collection('users').doc(uid);
       final phone = ((await userRef.get()).data()?['phone'] ?? '').toString();
       // حذف الملف وتحرير الرقم معاً ليستطيع التسجيل به لاحقاً
+      final un = ((await userRef.get()).data()?['username'] ?? '').toString();
       final batch = fs.batch()..delete(userRef);
+      if (un.isNotEmpty) batch.delete(fs.collection('usernames').doc(un));
       if (phone.isNotEmpty) {
         batch.delete(fs.collection('phones').doc(phone.replaceAll('+', '')));
       }
@@ -96,6 +99,23 @@ class SettingsScreen extends StatelessWidget {
                                     builder: (_) => VerifyPhoneScreen(phone: pv))),
                             child: const Text('توثيق'),
                           )),
+              );
+            },
+          ),
+          UserBuilder(
+            uid: user.uid,
+            builder: (_, u) {
+              final un = (u['username'] ?? '').toString();
+              return ListTile(
+                leading: const Icon(Icons.alternate_email),
+                title: const Text('اسم المستخدم'),
+                subtitle: un.isEmpty
+                    ? const Text('غير محدد، أضف اسماً ليجدك الناس بدون رقمك')
+                    : Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Text('@$un', textAlign: TextAlign.start)),
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const UsernameScreen())),
               );
             },
           ),

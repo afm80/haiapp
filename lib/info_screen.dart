@@ -146,6 +146,12 @@ class ChatInfoScreen extends StatelessWidget {
             Center(child: Avatar(photo: u['photo'] as String?, name: name, radius: 64)),
             const SizedBox(height: 16),
             Center(child: Text(name, style: Theme.of(context).textTheme.headlineSmall)),
+            if ((u['username'] ?? '').toString().isNotEmpty)
+              Center(
+                child: Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Text('@${u['username']}')),
+              ),
             if (phone.isNotEmpty)
               Center(
                 child: Row(

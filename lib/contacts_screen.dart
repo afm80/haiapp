@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'actions.dart';
 import 'app_colors.dart';
 import 'contacts_service.dart';
+import 'find_user_screen.dart';
 import 'new_group_screen.dart';
 import 'widgets.dart';
 
@@ -109,6 +110,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
                       MaterialPageRoute(builder: (_) => const NewGroupScreen()));
                 }),
               if (_q.isEmpty) _action(Icons.person_add, 'جهة اتصال جديدة', _newContact),
+              if (!isCall && _q.isEmpty)
+                _action(Icons.alternate_email, 'بحث باسم المستخدم', () {
+                  Navigator.pushReplacement(context,
+                      MaterialPageRoute(builder: (_) => const FindUserScreen()));
+                }),
               if (users.isNotEmpty) _header('جهات الاتصال على HaiApp'),
               if (users.isEmpty)
                 const Padding(
