@@ -103,9 +103,16 @@ service cloud.firestore {
         allow read: if signedIn() && isMember();
         allow create: if signedIn() && isMember()
           && request.resource.data.senderId == request.auth.uid;
-        // المرسل يعدّل ويحذف رسائله
-        allow update, delete: if signedIn() && isMember()
+        // المرسل يعدّل رسائله
+        allow update: if signedIn() && isMember()
           && resource.data.senderId == request.auth.uid;
+        // الحذف النهائي: المرسل (حذف للجميع)، أو عضو والباقون حذفوا الرسالة عندهم
+        allow delete: if signedIn() && isMember() && (
+          resource.data.senderId == request.auth.uid
+          || get(/databases/$(database)/documents/chats/$(chatId)).data.participants.toSet()
+               .difference(resource.data.get('deletedFor', []).toSet())
+               .difference([request.auth.uid].toSet()).size() == 0
+        );
         // أي عضو يقدر يضيف نفسه لقائمة "قرأ" فقط
         allow update: if signedIn() && isMember()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'deletedFor', 'reactions']);
