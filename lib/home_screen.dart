@@ -6,8 +6,10 @@ import 'package:flutter/material.dart';
 import 'actions.dart';
 import 'app_colors.dart';
 import 'calls_tab.dart';
+import 'chat_actions.dart';
 import 'chats_tab.dart';
 import 'contacts_screen.dart';
+import 'contacts_service.dart';
 import 'new_group_screen.dart';
 import 'settings_screen.dart';
 import 'status_tab.dart';
@@ -24,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final TabController _tabs = TabController(length: 3, vsync: this);
   final _query = ValueNotifier<String>('');
+  final _selection = ValueNotifier<Set<String>>(<String>{});
   final _searchCtrl = TextEditingController();
   bool _searching = false;
   bool _foreground = true;
@@ -34,7 +37,15 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _tabs.addListener(() => setState(() {}));
+    _tabs.addListener(() {
+      if (_tabs.index != 0 && _selection.value.isNotEmpty) _selection.value = <String>{};
+      setState(() {});
+    });
+    _selection.addListener(() {
+      if (mounted) setState(() {});
+    });
+    // يطلب إذن جهات الاتصال مرة واحدة ويحمّل أسماءها لعرضها في المحادثات
+    unawaited(ContactsService.load().then((_) {}, onError: (_) {}));
     setPresence(true);
     _heartbeat = Timer.periodic(const Duration(seconds: 60), (_) {
       if (_foreground) setPresence(true);
@@ -80,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen>
     _tabs.dispose();
     _searchCtrl.dispose();
     _query.dispose();
+    _selection.dispose();
     super.dispose();
   }
 
@@ -87,6 +99,46 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() => _searching = false);
     _searchCtrl.clear();
     _query.value = '';
+  }
+
+  bool get _selecting => _selection.value.isNotEmpty;
+
+  void _clearSelection() => _selection.value = <String>{};
+
+  PreferredSizeWidget _selectionBar() {
+    return AppBar(
+      leading: IconButton(icon: const Icon(Icons.close), onPressed: _clearSelection),
+      title: Text('${_selection.value.length}'),
+      actions: [
+        IconButton(
+          tooltip: 'تثبيت',
+          icon: const Icon(Icons.push_pin_outlined),
+          onPressed: () {
+            final ids = {..._selection.value};
+            _clearSelection();
+            toggleChatFlag(ids, 'pinnedBy');
+          },
+        ),
+        IconButton(
+          tooltip: 'أرشفة',
+          icon: const Icon(Icons.archive_outlined),
+          onPressed: () {
+            final ids = {..._selection.value};
+            _clearSelection();
+            toggleChatFlag(ids, 'archivedBy');
+          },
+        ),
+        IconButton(
+          tooltip: 'حذف',
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () async {
+            final ids = {..._selection.value};
+            final done = await deleteChatsConfirm(context, ids);
+            if (done) _clearSelection();
+          },
+        ),
+      ],
+    );
   }
 
   Widget? _fab() {
@@ -131,8 +183,20 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !_selecting,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _clearSelection();
+      },
+      child: _scaffold(context),
+    );
+  }
+
+  Widget _scaffold(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: _selecting
+          ? _selectionBar()
+          : AppBar(
         title: _searching
             ? TextField(
                 controller: _searchCtrl,
@@ -190,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen>
       body: TabBarView(
         controller: _tabs,
         children: [
-          ChatsTab(query: _query),
+          ChatsTab(query: _query, selection: _selection),
           const StatusTab(),
           const CallsTab(),
         ],

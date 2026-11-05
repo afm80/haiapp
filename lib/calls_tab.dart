@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'actions.dart';
 import 'app_colors.dart';
+import 'contacts_service.dart';
 import 'utils.dart';
 import 'widgets.dart';
 
@@ -66,32 +67,39 @@ class _CallsTabState extends State<CallsTab> {
 
     return UserBuilder(
       uid: otherId,
-      builder: (_, u) {
-        final name = (outgoing && callees.length > 1)
-            ? (d['title'] ?? 'مجموعة').toString()
-            : (u['name'] ?? (outgoing ? d['title'] : d['callerName']) ?? '').toString();
-        return ListTile(
-          leading: Avatar(photo: u['photo'] as String?, name: name, radius: 26),
-          title: Text(name,
-              style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: missed ? Theme.of(context).colorScheme.error : null)),
-          subtitle: Row(
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 4),
-              Text('$statusText · ${ts == null ? '' : '${dayLabel(ts.toDate())} ${hhmm(ts.toDate())}'}'),
-            ],
-          ),
-          trailing: IconButton(
-            icon: Icon(video ? Icons.videocam : Icons.call, color: AppColors.primary),
-            onPressed: () {
-              final targets = outgoing ? callees : [otherId];
-              startCall(context, calleeIds: targets, title: name, video: video);
-            },
-          ),
-        );
-      },
+      builder: (_, u) => ValueListenableBuilder<Map<String, String>?>(
+        valueListenable: ContactsService.names,
+        builder: (context, names, __) {
+          final multi = outgoing && callees.length > 1;
+          final shown = displayNameOf(otherId, u, names);
+          final name = multi
+              ? (d['title'] ?? 'مجموعة').toString()
+              : (shown.isNotEmpty
+                  ? shown
+                  : ((outgoing ? d['title'] : d['callerName']) ?? '').toString());
+          return ListTile(
+            leading: Avatar(photo: u['photo'] as String?, name: name, radius: 26),
+            title: Text(name,
+                style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: missed ? Theme.of(context).colorScheme.error : null)),
+            subtitle: Row(
+              children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(width: 4),
+                Text('$statusText · ${ts == null ? '' : '${dayLabel(ts.toDate())} ${hhmm(ts.toDate())}'}'),
+              ],
+            ),
+            trailing: IconButton(
+              icon: Icon(video ? Icons.videocam : Icons.call, color: AppColors.primary),
+              onPressed: () {
+                final targets = outgoing ? callees : [otherId];
+                startCall(context, calleeIds: targets, title: name, video: video);
+              },
+            ),
+          );
+        },
+      ),
     );
   }
 }

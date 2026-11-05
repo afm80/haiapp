@@ -3,14 +3,19 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'chat_actions.dart';
 import 'chat_screen.dart';
+import 'contacts_service.dart';
 import 'utils.dart';
 import 'widgets.dart';
 
 class ChatsTab extends StatefulWidget {
   final ValueListenable<String> query;
   final bool archived;
-  const ChatsTab({super.key, required this.query, this.archived = false});
+
+  /// المحادثات المحددة (الضغط المطوّل). إن كانت null تظهر قائمة خيارات بدل التحديد.
+  final ValueNotifier<Set<String>>? selection;
+  const ChatsTab({super.key, required this.query, this.archived = false, this.selection});
 
   @override
   State<ChatsTab> createState() => _ChatsTabState();
@@ -23,6 +28,41 @@ class _ChatsTabState extends State<ChatsTab> {
       .snapshots();
 
   String get _uid => currentUser.uid;
+
+  bool get _selecting => widget.selection?.value.isNotEmpty ?? false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.selection?.addListener(_onSelection);
+  }
+
+  @override
+  void dispose() {
+    widget.selection?.removeListener(_onSelection);
+    super.dispose();
+  }
+
+  void _onSelection() {
+    if (mounted) setState(() {});
+  }
+
+  void _toggle(String id) {
+    final s = {...widget.selection!.value};
+    if (!s.remove(id)) s.add(id);
+    widget.selection!.value = s;
+  }
+
+  /// المحادثة محذوفة عندي ولم تصل رسالة أحدث منذ الحذف
+  bool _hidden(Map<String, dynamic> d) {
+    final m = d['clearedAt'];
+    if (m is! Map || !m.containsKey(_uid)) return false;
+    final ts = m[_uid];
+    if (ts is! Timestamp) return true;
+    final last = (d['lastMessageAt'] as Timestamp?)?.millisecondsSinceEpoch;
+    if (last == null) return false; // رسالة جديدة قيد الإرسال
+    return last <= ts.millisecondsSinceEpoch;
+  }
 
   bool _flag(Map<String, dynamic> d, String key) =>
       List<String>.from(d[key] ?? const []).contains(_uid);
@@ -52,7 +92,9 @@ class _ChatsTabState extends State<ChatsTab> {
           if (!snap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final all = snap.data!.docs.where((d) => d.data()['lastMessage'] != null).toList();
+          final all = snap.data!.docs
+              .where((d) => d.data()['lastMessage'] != null && !_hidden(d.data()))
+              .toList();
           final archivedCount = all.where((d) => _flag(d.data(), 'archivedBy')).length;
           final docs = all
               .where((d) => _flag(d.data(), 'archivedBy') == widget.archived)
@@ -134,6 +176,15 @@ class _ChatsTabState extends State<ChatsTab> {
                 });
               },
             ),
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: Theme.of(ctx).colorScheme.error),
+              title: Text('حذف المحادثة',
+                  style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+              onTap: () {
+                Navigator.pop(ctx);
+                deleteChatsConfirm(context, {doc.id});
+              },
+            ),
           ],
         ),
       ),
@@ -154,8 +205,26 @@ class _ChatsTabState extends State<ChatsTab> {
       preview = '${d['lastSenderName']}: $preview';
     }
 
+    final selected = widget.selection?.value.contains(doc.id) ?? false;
+
     Widget row(String title, String? photo) => ListTile(
-          leading: Avatar(photo: photo, name: title, isGroup: isGroup, radius: 26),
+          selected: selected,
+          selectedTileColor: AppColors.primary.withAlpha(35),
+          leading: Stack(
+            children: [
+              Avatar(photo: photo, name: title, isGroup: isGroup, radius: 26),
+              if (selected)
+                const Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: CircleAvatar(
+                    radius: 11,
+                    backgroundColor: AppColors.primary,
+                    child: Icon(Icons.check, size: 15, color: Colors.white),
+                  ),
+                ),
+            ],
+          ),
           title: Text(title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -193,9 +262,15 @@ class _ChatsTabState extends State<ChatsTab> {
               ),
             ],
           ),
-          onTap: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => ChatScreen(chatId: doc.id))),
-          onLongPress: () => _menu(doc),
+          onTap: () {
+            if (_selecting) {
+              _toggle(doc.id);
+            } else {
+              Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => ChatScreen(chatId: doc.id)));
+            }
+          },
+          onLongPress: () => widget.selection != null ? _toggle(doc.id) : _menu(doc),
         );
 
     if (isGroup) return row(_titleOf(d), d['groupPhoto'] as String?);
@@ -203,7 +278,13 @@ class _ChatsTabState extends State<ChatsTab> {
         .firstWhere((id) => id != _uid, orElse: () => _uid) as String;
     return UserBuilder(
       uid: otherId,
-      builder: (_, u) => row((u['name'] ?? _titleOf(d)).toString(), u['photo'] as String?),
+      builder: (_, u) => ValueListenableBuilder<Map<String, String>?>(
+        valueListenable: ContactsService.names,
+        builder: (_, names, __) {
+          final shown = displayNameOf(otherId, u, names);
+          return row(shown.isNotEmpty ? shown : _titleOf(d), u['photo'] as String?);
+        },
+      ),
     );
   }
 }

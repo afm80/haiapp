@@ -6,6 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'contacts_service.dart';
+
 final fs = FirebaseFirestore.instance;
 User get currentUser => FirebaseAuth.instance.currentUser!;
 
@@ -70,6 +72,7 @@ Future<void> setPresence(bool online) async {
 
 Future<void> signOutUser() async {
   await setPresence(false);
+  ContactsService.clear();
   await FirebaseAuth.instance.signOut();
 }
 

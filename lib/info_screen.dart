@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'actions.dart';
 import 'add_members_screen.dart';
 import 'app_colors.dart';
+import 'contacts_service.dart';
 import 'utils.dart';
 import 'widgets.dart';
 
@@ -136,13 +137,19 @@ class ChatInfoScreen extends StatelessWidget {
     return UserBuilder(
       uid: otherId,
       builder: (context, u) {
-        final name = (u['name'] ?? '').toString();
+        final shown = displayNameOf(otherId, u, ContactsService.names.value);
+        final name = shown.isNotEmpty ? shown : (u['name'] ?? '').toString();
+        final phone = (u['phone'] ?? '').toString();
         return ListView(
           padding: const EdgeInsets.all(24),
           children: [
             Center(child: Avatar(photo: u['photo'] as String?, name: name, radius: 64)),
             const SizedBox(height: 16),
             Center(child: Text(name, style: Theme.of(context).textTheme.headlineSmall)),
+            if (phone.isNotEmpty)
+              Center(
+                  child: Directionality(
+                      textDirection: TextDirection.ltr, child: Text(phone))),
             Center(child: Text(presenceText(u))),
             const SizedBox(height: 24),
             Row(

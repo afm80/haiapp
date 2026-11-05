@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'actions.dart';
 import 'app_colors.dart';
@@ -29,6 +31,38 @@ class _ContactsScreenState extends State<ContactsScreen> {
     super.dispose();
   }
 
+  Future<void> _newContact() async {
+    try {
+      await FlutterContacts.openExternalInsert();
+    } catch (_) {}
+    if (mounted) setState(() => _reload++);
+  }
+
+  Future<void> _invite() async {
+    final uri = Uri(scheme: 'sms', queryParameters: {
+      'body': 'انضم إليّ على HaiApp للمحادثة والمكالمات المجانية!'
+    });
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+  Widget _action(IconData icon, String label, VoidCallback onTap) => ListTile(
+        leading: CircleAvatar(
+            radius: 24,
+            backgroundColor: AppColors.accent,
+            child: Icon(icon, color: Colors.white)),
+        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        onTap: onTap,
+      );
+
+  Widget _header(String text) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+        child: Text(text,
+            style: TextStyle(
+                fontWeight: FontWeight.w600, color: Theme.of(context).hintColor)),
+      );
+
   @override
   Widget build(BuildContext context) {
     final isCall = widget.mode == ContactsMode.call;
@@ -46,7 +80,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     border: InputBorder.none),
                 onChanged: (v) => setState(() => _q = v.trim()),
               )
-            : Text(isCall ? 'اختر جهة اتصال' : 'محادثة جديدة'),
+            : Text(isCall ? 'اختر جهة اتصال' : 'اختر جهة اتصال'),
         actions: [
           IconButton(
             icon: Icon(_searching ? Icons.close : Icons.search),
@@ -70,14 +104,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
           return ListView(
             children: [
               if (!isCall && _q.isEmpty)
-                ListTile(
-                  leading: const CircleAvatar(
-                      backgroundColor: AppColors.accent,
-                      child: Icon(Icons.group_add, color: Colors.white)),
-                  title: const Text('مجموعة جديدة'),
-                  onTap: () => Navigator.pushReplacement(context,
-                      MaterialPageRoute(builder: (_) => const NewGroupScreen())),
-                ),
+                _action(Icons.group_add, 'مجموعة جديدة', () {
+                  Navigator.pushReplacement(context,
+                      MaterialPageRoute(builder: (_) => const NewGroupScreen()));
+                }),
+              if (_q.isEmpty) _action(Icons.person_add, 'جهة اتصال جديدة', _newContact),
+              if (users.isNotEmpty) _header('جهات الاتصال على HaiApp'),
               if (users.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(32),
@@ -116,6 +148,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
                       ? null
                       : () => openDirectChat(context, m.uid, m.name, replace: true),
                 ),
+              if (_q.isEmpty) ...[
+                const Divider(height: 24),
+                _action(Icons.share, 'دعوة أصدقاء إلى HaiApp', _invite),
+              ],
             ],
           );
         },

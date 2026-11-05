@@ -25,16 +25,33 @@ class ContactsResult {
   const ContactsResult(this.granted, this.matches);
 }
 
+/// الاسم الذي يُعرض للمستخدم مثل واتساب:
+/// اسمه في دفتر هاتفك، وإن لم يكن محفوظاً يظهر رقمه، وإن لم تُمنح صلاحية الجهات يظهر اسم ملفه.
+String displayNameOf(String uid, Map<String, dynamic> u, Map<String, String>? names) {
+  final profile = (u['name'] ?? '').toString();
+  if (names == null) return profile;
+  final saved = names[uid];
+  if (saved != null && saved.isNotEmpty) return saved;
+  final phone = (u['phone'] ?? '').toString();
+  return phone.isNotEmpty ? '\u200E$phone' : profile;
+}
+
 class ContactsService {
   static ContactsResult? _cache;
   static String? _cacheUid;
+
+  /// uid ← اسم الجهة في دفتر الهاتف. null = لم تُمنح صلاحية الجهات (يُعرض اسم الملف الشخصي).
+  static final ValueNotifier<Map<String, String>?> names = ValueNotifier(null);
 
   static Future<ContactsResult> load({bool force = false}) async {
     final me = currentUser.uid;
     if (!force && _cache != null && _cacheUid == me) return _cache!;
 
     final granted = await FlutterContacts.requestPermission(readonly: true);
-    if (!granted) return const ContactsResult(false, []);
+    if (!granted) {
+      names.value = null;
+      return const ContactsResult(false, []);
+    }
 
     // رمز دولة المستخدم لإكمال الأرقام المحلية (0770... ← +964770...)
     final meDoc = await fs.collection('users').doc(me).get();
@@ -95,12 +112,17 @@ class ContactsService {
 
     _cache = ContactsResult(true, matches);
     _cacheUid = me;
+    names.value = {
+      for (final m in matches)
+        if (m.contactName.trim().isNotEmpty) m.uid: m.contactName.trim()
+    };
     return _cache!;
   }
 
   static void clear() {
     _cache = null;
     _cacheUid = null;
+    names.value = null;
   }
 
   static String phoneKeyOf(dynamic phone) =>

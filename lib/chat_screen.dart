@@ -11,6 +11,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import 'actions.dart';
+import 'chat_actions.dart';
+import 'contacts_service.dart';
 import 'app_colors.dart';
 import 'audio_bubble.dart';
 import 'forward_screen.dart';
@@ -480,8 +482,11 @@ class _ChatScreenState extends State<ChatScreen> {
       callTitle = (names[otherId] ?? 'مستخدم').toString();
       title = UserBuilder(
         uid: otherId,
-        builder: (_, u) => header((u['name'] ?? callTitle).toString(),
-            u['photo'] as String?, typing ?? presenceText(u)),
+        builder: (_, u) {
+          final shown = displayNameOf(otherId, u, ContactsService.names.value);
+          return header(shown.isNotEmpty ? shown : callTitle, u['photo'] as String?,
+              typing ?? presenceText(u));
+        },
       );
     }
 
@@ -503,6 +508,10 @@ class _ChatScreenState extends State<ChatScreen> {
           onSelected: (v) {
             if (v == 'search') {
               setState(() => _searching = true);
+            } else if (v == 'delete') {
+              deleteChatsConfirm(context, {widget.chatId}).then((done) {
+                if (done && mounted) Navigator.pop(context);
+              });
             } else {
               _openInfo();
             }
@@ -510,6 +519,7 @@ class _ChatScreenState extends State<ChatScreen> {
           itemBuilder: (_) => const [
             PopupMenuItem(value: 'search', child: Text('بحث')),
             PopupMenuItem(value: 'info', child: Text('معلومات')),
+            PopupMenuItem(value: 'delete', child: Text('حذف المحادثة')),
           ],
         ),
       ],
@@ -524,9 +534,15 @@ class _ChatScreenState extends State<ChatScreen> {
           return const Center(child: CircularProgressIndicator());
         }
         _markRead(snap.data!.docs);
+        final cleared = ((_chat['clearedAt'] as Map?)?[_uid] as Timestamp?)?.toDate();
         var docs = snap.data!.docs
             .where((d) =>
                 !List<String>.from(d.data()['deletedFor'] ?? const []).contains(_uid))
+            .where((d) {
+              if (cleared == null) return true;
+              final t = (d.data()['createdAt'] as Timestamp?)?.toDate();
+              return t == null || t.isAfter(cleared);
+            })
             .toList();
         if (_searching && _q.isNotEmpty) {
           docs = docs.where((d) => (d.data()['text'] ?? '').toString().contains(_q)).toList();
