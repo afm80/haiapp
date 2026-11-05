@@ -119,7 +119,10 @@ s = re.sub(r'android:label="[^"]*"', 'android:label="HaiApp"', s, count=1)
 perms = ('    <uses-permission android:name="android.permission.INTERNET"/>\n'
          '    <uses-permission android:name="android.permission.CAMERA"/>\n'
          '    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n'
-         '    <uses-permission android:name="android.permission.READ_CONTACTS"/>\n')
+         '    <uses-permission android:name="android.permission.READ_CONTACTS"/>\n'
+         '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n'
+         '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n'
+         '    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>\n')
 if "android.permission.INTERNET" not in s.split("<application")[0]:
     s = s.replace("<application", perms + "    <application", 1)
 mf.write_text(s)
