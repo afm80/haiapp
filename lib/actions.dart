@@ -2,8 +2,8 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import 'call_screen.dart';
 import 'chat_screen.dart';
 import 'utils.dart';
 
@@ -26,15 +26,10 @@ Future<void> openDirectChat(
   }
 }
 
-/// المكالمات تتم عبر Jitsi Meet المجاني (مفتوح المصدر)
-Future<void> joinCall(String room, bool video) async {
-  // disableDeepLinking: يتخطى صفحة "Join in app / Join in browser" ويدخل الاجتماع مباشرة
-  final url = Uri.parse('https://meet.jit.si/$room'
-      '#config.startWithVideoMuted=${!video}'
-      '&config.startWithAudioMuted=false'
-      '&config.prejoinPageEnabled=false'
-      '&config.disableDeepLinking=true');
-  await launchUrl(url, mode: LaunchMode.externalApplication);
+/// المكالمات تتم داخل التطبيق عبر Agora
+Future<void> joinCall(BuildContext context, String room, bool video, String title) async {
+  await Navigator.push(context,
+      MaterialPageRoute(builder: (_) => CallScreen(room: room, video: video, title: title)));
 }
 
 Future<void> startCall(
@@ -57,7 +52,8 @@ Future<void> startCall(
     'status': 'ringing',
     'createdAt': FieldValue.serverTimestamp(),
   });
-  await joinCall(room, video);
+  if (!context.mounted) return;
+  await joinCall(context, room, video, title);
 }
 
 /// إرسال رسالة لمحادثة (يُستخدم في الإرسال العادي والتحويل)

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'actions.dart';
 import 'app_colors.dart';
+import 'call_screen.dart';
 import 'calls_tab.dart';
 import 'chat_actions.dart';
 import 'chats_tab.dart';
@@ -318,9 +319,14 @@ class _IncomingCallDialogState extends State<IncomingCallDialog> {
   void _answer(bool accept) {
     _timeout?.cancel();
     _ref.update({'status': accept ? 'answered' : 'declined'}).catchError((_) {});
-    Navigator.pop(context);
+    final nav = Navigator.of(context);
+    nav.pop();
     if (accept) {
-      joinCall(widget.data['room'] as String, widget.data['type'] == 'video');
+      nav.push(MaterialPageRoute(
+          builder: (_) => CallScreen(
+              room: widget.data['room'] as String,
+              video: widget.data['type'] == 'video',
+              title: (widget.data['callerName'] ?? '').toString())));
     }
   }
 
