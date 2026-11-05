@@ -148,8 +148,17 @@ class ChatInfoScreen extends StatelessWidget {
             Center(child: Text(name, style: Theme.of(context).textTheme.headlineSmall)),
             if (phone.isNotEmpty)
               Center(
-                  child: Directionality(
-                      textDirection: TextDirection.ltr, child: Text(phone))),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Directionality(textDirection: TextDirection.ltr, child: Text(phone)),
+                    if (u['phoneVerified'] == true) ...[
+                      const SizedBox(width: 4),
+                      const Icon(Icons.verified, size: 16, color: Color(0xFF1DA1F2)),
+                    ],
+                  ],
+                ),
+              ),
             Center(child: Text(presenceText(u))),
             const SizedBox(height: 24),
             Row(

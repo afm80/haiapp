@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'blocked_screen.dart';
 import 'profile_setup_screen.dart';
 import 'utils.dart';
+import 'verify_phone_screen.dart';
 import 'widgets.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -72,13 +73,30 @@ class SettingsScreen extends StatelessWidget {
           const Divider(),
           UserBuilder(
             uid: user.uid,
-            builder: (_, u) => ListTile(
-              leading: const Icon(Icons.phone_outlined),
-              title: const Text('رقم الموبايل'),
-              subtitle: Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: Text((u['phone'] ?? '').toString(), textAlign: TextAlign.start)),
-            ),
+            builder: (_, u) {
+              final verified = u['phoneVerified'] == true;
+              final pv = phoneValueFromUser(u);
+              return ListTile(
+                leading: const Icon(Icons.phone_outlined),
+                title: const Text('رقم الموبايل'),
+                subtitle: Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Text((u['phone'] ?? '').toString(), textAlign: TextAlign.start)),
+                trailing: verified
+                    ? const Tooltip(
+                        message: 'موثّق',
+                        child: Icon(Icons.verified, color: Color(0xFF1DA1F2)))
+                    : (pv == null
+                        ? null
+                        : TextButton(
+                            onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => VerifyPhoneScreen(phone: pv))),
+                            child: const Text('توثيق'),
+                          )),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.email_outlined),

@@ -8,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 import 'app_colors.dart';
 import 'phone.dart';
 import 'utils.dart';
+import 'verify_config.dart';
+import 'verify_phone_screen.dart';
 import 'widgets.dart';
 
 /// إعداد الملف الشخصي بعد التسجيل (الاسم + نبذة + صورة)، ويُستخدم أيضاً للتعديل
@@ -26,6 +28,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   PhoneValue? _phone; // الرقم المُدخل (تسجيل جديد)
   String? _savedPhone; // الرقم المحفوظ سابقاً (للعرض فقط ولا يمكن تغييره)
   bool _saving = false;
+  bool _taken = false; // الرقم محجوز لحساب آخر
   String? _error;
 
   @override
@@ -72,6 +75,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     setState(() {
       _saving = true;
       _error = null;
+      _taken = false;
     });
     try {
       await currentUser.updateDisplayName(name);
@@ -90,7 +94,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       }
       if (widget.isEdit && mounted) Navigator.pop(context);
     } on PhoneTakenException {
-      if (mounted) setState(() => _error = 'هذا الرقم مسجّل بحساب آخر');
+      if (mounted) {
+        setState(() {
+          _error = 'هذا الرقم مسجّل بحساب آخر';
+          _taken = true;
+        });
+      }
     } on FirebaseException catch (e) {
       if (mounted) setState(() => _error = 'تعذر الحفظ [${e.code}] ${e.message ?? ''}');
     } catch (e) {
@@ -173,6 +182,29 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(_error!,
                     style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              ),
+            if (_taken && (kTelegramBot.isNotEmpty || kWhatsAppNumber.isNotEmpty))
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.verified_user_outlined),
+                  label: const Text('هذا رقمي، أريد توثيقه ونقله لحسابي'),
+                  onPressed: () async {
+                    final pv = _phone;
+                    if (pv == null) return;
+                    final ok = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => VerifyPhoneScreen(phone: pv, claim: true)));
+                    if (ok == true && mounted) {
+                      setState(() {
+                        _savedPhone = pv.e164;
+                        _taken = false;
+                        _error = null;
+                      });
+                    }
+                  },
+                ),
               ),
             const SizedBox(height: 20),
             SizedBox(
