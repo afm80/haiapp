@@ -8,11 +8,14 @@ service cloud.firestore {
     // الرقم يُحجز لحساب واحد فقط، ولا يتغير بعد حفظه.
 
     // الرقم المكتوب في ملف المستخدم محجوز فعلاً لهذا الحساب (يُفحص بعد العملية نفسها)
+    // phoneKey = الرمز الدولي + الرقم بدون + (مثل 9647701234567)، وphone = '+' + phoneKey
     function phoneClaimedAfter(d) {
       return d.phone is string
-        && d.phone.matches('^\\+[0-9]{7,15}$')
-        && existsAfter(/databases/$(database)/documents/phones/$(d.phone.replace('+', '')))
-        && getAfter(/databases/$(database)/documents/phones/$(d.phone.replace('+', ''))).data.uid == request.auth.uid;
+        && d.phoneKey is string
+        && d.phoneKey.matches('^[0-9]{7,15}$')
+        && d.phone == '+' + d.phoneKey
+        && existsAfter(/databases/$(database)/documents/phones/$(d.phoneKey))
+        && getAfter(/databases/$(database)/documents/phones/$(d.phoneKey)).data.uid == request.auth.uid;
     }
 
     match /phones/{key} {
@@ -23,7 +26,7 @@ service cloud.firestore {
         && key.matches('^[0-9]{7,15}$')
         && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
         && request.resource.data.uid == request.auth.uid
-        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.phone == '+' + key;
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.phoneKey == key;
       // لا يُحرَّر الرقم إلا عند حذف الحساب نفسه
       allow delete: if signedIn()
         && resource.data.uid == request.auth.uid
@@ -40,13 +43,28 @@ service cloud.firestore {
         && (
           // تعديل عادي لا يمس الرقم
           !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['phone', 'phoneCountry', 'phoneVerified'])
+              .hasAny(['phone', 'phoneKey', 'phoneCountry', 'phoneVerified'])
           // أو أول حجز للرقم (يُمنع تغييره بعدها)
           || (!('phone' in resource.data)
               && request.resource.data.get('phoneVerified', false) == false
               && phoneClaimedAfter(request.resource.data))
         );
       allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // طلبات توثيق الرقم: ينشئها التطبيق فقط، ويقرؤها ويكمل التوثيق الخادم (Webhook)
+    match /verifications/{code} {
+      allow create: if signedIn()
+        && code.matches('^[A-Z0-9]{12}$')
+        && request.resource.data.keys().hasOnly(['uid', 'phoneKey', 'country', 'claim', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.phoneKey.matches('^[0-9]{7,15}$')
+        && request.resource.data.country.matches('^[0-9]{1,4}$')
+        && request.resource.data.claim is bool
+        && (request.resource.data.claim == true
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.phoneKey
+                == request.resource.data.phoneKey);
+      allow read, update, delete: if false;
     }
 
     match /chats/{chatId} {
