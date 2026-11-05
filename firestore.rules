@@ -18,6 +18,26 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/phones/$(d.phoneKey)).data.uid == request.auth.uid;
     }
 
+    // ---- أسماء المستخدمين (@username): وثيقة لكل اسم، بحث بالاسم الدقيق فقط ----
+    function usernameClaimedAfter(d) {
+      return d.username is string
+        && d.username.matches('^[a-z][a-z0-9_]{3,23}$')
+        && existsAfter(/databases/$(database)/documents/usernames/$(d.username))
+        && getAfter(/databases/$(database)/documents/usernames/$(d.username)).data.uid == request.auth.uid;
+    }
+
+    match /usernames/{name} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && name.matches('^[a-z][a-z0-9_]{3,23}$')
+        && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('username', '') == name;
+      allow update: if false;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
     match /phones/{key} {
       allow get: if signedIn();
       // البحث عن جهات الاتصال على دفعات (10 كحد أقصى) لمنع سحب كل الأرقام
@@ -38,8 +58,10 @@ service cloud.firestore {
       allow list: if signedIn() && request.query.limit <= 10;
       allow create: if signedIn() && request.auth.uid == uid
         && request.resource.data.get('phoneVerified', false) == false
-        && (!('phone' in request.resource.data) || phoneClaimedAfter(request.resource.data));
+        && (!('phone' in request.resource.data) || phoneClaimedAfter(request.resource.data))
+        && (!('username' in request.resource.data) || usernameClaimedAfter(request.resource.data));
       allow update: if signedIn() && request.auth.uid == uid
+        && (!('username' in request.resource.data) || usernameClaimedAfter(request.resource.data))
         && (
           // تعديل عادي لا يمس الرقم
           !request.resource.data.diff(resource.data).affectedKeys()
