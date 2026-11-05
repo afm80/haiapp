@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'app_colors.dart';
+import 'contacts_service.dart';
 import 'utils.dart';
 import 'widgets.dart';
 
@@ -64,15 +65,22 @@ void openTextStatusCreator(BuildContext context) {
       context, MaterialPageRoute(builder: (_) => const CreateTextStatusScreen()));
 }
 
-Future<void> _addStatus(Map<String, dynamic> data) {
+Future<void> _addStatus(Map<String, dynamic> data) async {
   final now = DateTime.now();
-  return fs.collection('statuses').add({
+  // تظهر الحالة لجهات اتصالك المسجلة في التطبيق فقط (مثل واتساب)، ولك أنت
+  var visibleTo = <String>[currentUser.uid];
+  try {
+    final res = await ContactsService.load();
+    visibleTo = {currentUser.uid, ...res.matches.map((m) => m.uid)}.toList();
+  } catch (_) {}
+  await fs.collection('statuses').add({
     ...data,
     'uid': currentUser.uid,
     'name': currentUser.displayName ?? '',
     'createdAt': FieldValue.serverTimestamp(),
     'expiresAt': Timestamp.fromDate(now.add(const Duration(hours: 24))),
     'viewers': <String>[],
+    'visibleTo': visibleTo,
   });
 }
 
@@ -154,10 +162,39 @@ class StatusTab extends StatefulWidget {
 }
 
 class _StatusTabState extends State<StatusTab> {
+  // الحالات المسموح لي بمشاهدتها فقط (الانتهاء يُفلتر داخل التطبيق)
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _stream = fs
       .collection('statuses')
-      .where('expiresAt', isGreaterThan: Timestamp.now())
+      .where('visibleTo', arrayContains: currentUser.uid)
       .snapshots();
+
+  @override
+  void initState() {
+    super.initState();
+    _cleanupExpired();
+  }
+
+  /// حذف حالاتي المنتهية من قاعدة البيانات لتوفير المساحة
+  Future<void> _cleanupExpired() async {
+    try {
+      final snap = await fs
+          .collection('statuses')
+          .where('visibleTo', arrayContains: currentUser.uid)
+          .get();
+      final now = DateTime.now();
+      final batch = fs.batch();
+      var n = 0;
+      for (final d in snap.docs) {
+        final data = d.data();
+        final exp = (data['expiresAt'] as Timestamp?)?.toDate();
+        if (data['uid'] == currentUser.uid && exp != null && exp.isBefore(now)) {
+          batch.delete(d.reference);
+          n++;
+        }
+      }
+      if (n > 0) await batch.commit();
+    } catch (_) {}
+  }
 
   void _open(List<StatusDoc> list, String ownerUid) {
     Navigator.push(
