@@ -7,7 +7,9 @@ import 'utils.dart';
 import 'widgets.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  /// true = يُعرض داخل تبويب "أنت" بدون شريط علوي خاص به
+  final bool embedded;
+  const SettingsScreen({super.key, this.embedded = false});
 
   Future<void> _deleteAccount(BuildContext context) async {
     final ok = await showDialog<bool>(
@@ -47,9 +49,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = currentUser;
     final err = Theme.of(context).colorScheme.error;
-    return Scaffold(
-      appBar: AppBar(title: const Text('الإعدادات')),
-      body: ListView(
+    final list = ListView(
         children: [
           UserBuilder(
             uid: user.uid,
@@ -111,7 +111,8 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => _deleteAccount(context),
           ),
         ],
-      ),
-    );
+      );
+    if (embedded) return list;
+    return Scaffold(appBar: AppBar(title: const Text('الإعدادات')), body: list);
   }
 }

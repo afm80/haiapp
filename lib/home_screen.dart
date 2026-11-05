@@ -24,7 +24,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  late final TabController _tabs = TabController(length: 3, vsync: this);
+  late final TabController _tabs = TabController(length: 4, vsync: this);
   final _query = ValueNotifier<String>('');
   final _selection = ValueNotifier<Set<String>>(<String>{});
   final _searchCtrl = TextEditingController();
@@ -169,7 +169,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ],
         );
-      default:
+      case 2:
         return FloatingActionButton(
           heroTag: 'fab_call',
           onPressed: () => Navigator.push(
@@ -178,6 +178,8 @@ class _HomeScreenState extends State<HomeScreen>
                   builder: (_) => const ContactsScreen(mode: ContactsMode.call))),
           child: const Icon(Icons.add_call),
         );
+      default:
+        return null; // تبويب "أنت" بلا زر عائم
     }
   }
 
@@ -209,7 +211,8 @@ class _HomeScreenState extends State<HomeScreen>
                     border: InputBorder.none),
                 onChanged: (v) => _query.value = v.trim(),
               )
-            : const Text('HaiApp', style: TextStyle(fontWeight: FontWeight.bold)),
+            : Text(_tabs.index == 3 ? 'أنت' : 'HaiApp',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           if (_searching)
             IconButton(icon: const Icon(Icons.close), onPressed: _stopSearch)
@@ -238,18 +241,6 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ],
         ],
-        bottom: TabBar(
-          controller: _tabs,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: AppColors.accent,
-          indicatorWeight: 3,
-          tabs: const [
-            Tab(text: 'المحادثات'),
-            Tab(text: 'الحالة'),
-            Tab(text: 'المكالمات'),
-          ],
-        ),
       ),
       body: TabBarView(
         controller: _tabs,
@@ -257,6 +248,29 @@ class _HomeScreenState extends State<HomeScreen>
           ChatsTab(query: _query, selection: _selection),
           const StatusTab(),
           const CallsTab(),
+          const SettingsScreen(embedded: true),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tabs.index,
+        onDestinationSelected: (i) => _tabs.animateTo(i),
+        destinations: const [
+          NavigationDestination(
+              icon: Icon(Icons.chat_outlined),
+              selectedIcon: Icon(Icons.chat),
+              label: 'المحادثات'),
+          NavigationDestination(
+              icon: Icon(Icons.donut_large_outlined),
+              selectedIcon: Icon(Icons.donut_large),
+              label: 'الحالة'),
+          NavigationDestination(
+              icon: Icon(Icons.call_outlined),
+              selectedIcon: Icon(Icons.call),
+              label: 'المكالمات'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'أنت'),
         ],
       ),
       floatingActionButton: _fab(),
