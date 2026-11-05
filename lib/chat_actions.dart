@@ -23,18 +23,10 @@ Future<bool> deleteChatsConfirm(BuildContext context, Set<String> ids) async {
     ),
   );
   if (ok != true) return false;
-  final uid = currentUser.uid;
   try {
-    final batch = fs.batch();
     for (final id in ids) {
-      batch.update(fs.collection('chats').doc(id), {
-        'clearedAt.$uid': FieldValue.serverTimestamp(),
-        'unread.$uid': 0,
-        'pinnedBy': FieldValue.arrayRemove([uid]),
-        'archivedBy': FieldValue.arrayRemove([uid]),
-      });
+      await _purgeChat(id, currentUser.uid);
     }
-    await batch.commit();
     return true;
   } catch (_) {
     if (context.mounted) {
@@ -42,6 +34,60 @@ Future<bool> deleteChatsConfirm(BuildContext context, Set<String> ids) async {
           .showSnackBar(const SnackBar(content: Text('تعذر حذف المحادثة')));
     }
     return false;
+  }
+}
+
+/// حذف فعلي للمحادثة من حسابي:
+/// - كل رسالة تُعلَّم "محذوفة عندي"؛ وإذا كان الباقون قد حذفوها أيضاً تُمسح نهائياً من قاعدة البيانات.
+/// - المحادثة تختفي من قائمتي، وتعود فارغة إن وصلت رسالة جديدة.
+Future<void> _purgeChat(String chatId, String uid) async {
+  final chatRef = fs.collection('chats').doc(chatId);
+  final chat = await chatRef.get();
+  final parts = List<String>.from(chat.data()?['participants'] ?? const []);
+  final others = parts.where((p) => p != uid).toList();
+  final msgs = await chatRef.collection('messages').get();
+
+  final ops = <void Function(WriteBatch)>[];
+  var allGone = true;
+  for (final m in msgs.docs) {
+    final d = List<String>.from(m.data()['deletedFor'] ?? const []);
+    final othersDone = others.every(d.contains);
+    if (othersDone) {
+      ops.add((b) => b.delete(m.reference));
+    } else {
+      allGone = false;
+      if (!d.contains(uid)) {
+        ops.add((b) => b.update(m.reference, {'deletedFor': FieldValue.arrayUnion([uid])}));
+      }
+    }
+  }
+  ops.add((b) => b.update(chatRef, {
+        'clearedAt.$uid': FieldValue.serverTimestamp(),
+        'unread.$uid': 0,
+        'pinnedBy': FieldValue.arrayRemove([uid]),
+        'archivedBy': FieldValue.arrayRemove([uid]),
+        if (allGone) 'lastMessage': '',
+      }));
+  for (var i = 0; i < ops.length; i += 400) {
+    final batch = fs.batch();
+    for (final op in ops.skip(i).take(400)) {
+      op(batch);
+    }
+    await batch.commit();
+  }
+}
+
+/// حذف رسالة واحدة عندي: تُعلَّم محذوفة، وتُمسح نهائياً إذا حذفها الباقون أيضاً
+Future<void> deleteMessageForMe(
+    DocumentReference<Map<String, dynamic>> ref, List<String> participants) async {
+  final uid = currentUser.uid;
+  final snap = await ref.get();
+  final d = List<String>.from(snap.data()?['deletedFor'] ?? const []);
+  final othersDone = participants.where((p) => p != uid).every(d.contains);
+  if (othersDone) {
+    await ref.delete();
+  } else {
+    await ref.update({'deletedFor': FieldValue.arrayUnion([uid])});
   }
 }
 

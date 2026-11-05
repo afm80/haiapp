@@ -363,9 +363,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 title: const Text('حذف عندي'),
                 onTap: () {
                   Navigator.pop(ctx);
-                  doc.reference.update({
-                    'deletedFor': FieldValue.arrayUnion([_uid])
-                  });
+                  deleteMessageForMe(doc.reference, _participants);
                 },
               ),
               if (mine)
