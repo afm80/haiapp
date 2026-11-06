@@ -69,13 +69,15 @@ class _HomeScreenState extends State<HomeScreen>
   void _listenForCalls() {
     _callSub = fs
         .collection('calls')
-        .where('calleeIds', arrayContains: currentUser.uid)
+        .where('participants', arrayContains: currentUser.uid)
         .snapshots()
         .listen((snap) {
       for (final ch in snap.docChanges) {
         if (ch.type != DocumentChangeType.added) continue;
         final d = ch.doc.data();
         if (d == null) continue;
+        // المكالمات الواردة فقط (ليست التي أجريتها أنا)
+        if (!List<String>.from(d['calleeIds'] ?? const []).contains(currentUser.uid)) continue;
         final ts = d['createdAt'] as Timestamp?;
         final fresh =
             ts != null && DateTime.now().difference(ts.toDate()).inSeconds < 40;
@@ -88,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen>
           );
         }
       }
-    });
+    }, onError: (_) {});
   }
 
   @override
