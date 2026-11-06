@@ -1,160 +1,107 @@
-// HaiApp – خادم توثيق الأرقام (Cloudflare Worker)
-// يستقبل رسائل تيليجرام وواتساب ويوثّق الرقم في Firestore.
-// المتغيرات السرية (Secrets): TG_TOKEN, TG_SECRET, WA_TOKEN, WA_PHONE_ID, WA_VERIFY, FB_PROJECT, FB_CLIENT_EMAIL, FB_PRIVATE_KEY
+// HaiApp – خادم تذاكر المكالمات (Cloudflare Worker)
+// يتحقق أن الطالب مسجّل دخوله في Firebase ثم يصدر تذكرة دخول مؤقتة لقناة Agora.
+// المتغيّر السري المطلوب: AGORA_CERT (الشهادة من لوحة Agora)
+// اختيارية: AGORA_APP_ID, FB_PROJECT (لهما قيم افتراضية أدناه)
 
-const FS = (e) => `https://firestore.googleapis.com/v1/projects/${e.FB_PROJECT}/databases/(default)/documents`;
+const DEFAULT_APP_ID = '2a1312d2e66647ab9ba50eca869abb03';
+const DEFAULT_FB_PROJECT = 'haiapp80';
+const TOKEN_SECONDS = 4 * 3600;
 
-// ---------- تسجيل الدخول لـ Firestore بحساب الخدمة ----------
-let tokenCache = { t: null, exp: 0 };
-const b64u = (b) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-const b64uStr = (s) => b64u(new TextEncoder().encode(s));
+const enc = new TextEncoder();
 
-async function accessToken(env) {
-  if (tokenCache.t && Date.now() < tokenCache.exp) return tokenCache.t;
+// ---------- تجميع البايتات (little-endian) كما في AccessToken2 ----------
+const u16 = (n) => { const b = new Uint8Array(2); new DataView(b.buffer).setUint16(0, n, true); return b; };
+const u32 = (n) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n >>> 0, true); return b; };
+const cat = (...parts) => {
+  const out = new Uint8Array(parts.reduce((a, p) => a + p.length, 0));
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+};
+const pstr = (s) => { const b = typeof s === 'string' ? enc.encode(s) : s; return cat(u16(b.length), b); };
+
+async function hmac(key, data) {
+  const k = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return new Uint8Array(await crypto.subtle.sign('HMAC', k, data));
+}
+
+async function deflate(bytes) {
+  const cs = new CompressionStream('deflate'); // zlib
+  const w = cs.writable.getWriter();
+  w.write(bytes); w.close();
+  return new Uint8Array(await new Response(cs.readable).arrayBuffer());
+}
+
+// ---------- بناء تذكرة RTC (الإصدار 007) ----------
+async function buildRtcToken(appId, cert, channel, seconds) {
+  const issueTs = Math.floor(Date.now() / 1000);
+  const salt = crypto.getRandomValues(new Uint32Array(1))[0];
+
+  // الخدمة: RTC (النوع 1) بصلاحيات الانضمام والنشر (صوت/فيديو/بيانات)
+  const privs = [1, 2, 3, 4].map((k) => cat(u16(k), u32(seconds)));
+  const service = cat(u16(1), u16(4), ...privs, pstr(channel), pstr('')); // uid فارغ = أي مستخدم
+
+  const signing1 = await hmac(u32(issueTs), enc.encode(cert));
+  const signing = await hmac(u32(salt), signing1);
+
+  const info = cat(pstr(appId), u32(issueTs), u32(seconds), u32(salt), u16(1), service);
+  const signature = await hmac(signing, info);
+  const content = cat(pstr(signature), info);
+  const packed = await deflate(content);
+  let bin = '';
+  for (const c of packed) bin += String.fromCharCode(c);
+  return '007' + btoa(bin);
+}
+
+// ---------- التحقق من توكن Firebase ----------
+let jwksCache = { keys: null, exp: 0 };
+const b64uToBytes = (s) => {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+};
+
+async function verifyFirebase(env, idToken) {
+  const parts = idToken.split('.');
+  if (parts.length !== 3) throw new Error('bad token');
+  const header = JSON.parse(new TextDecoder().decode(b64uToBytes(parts[0])));
+  const payload = JSON.parse(new TextDecoder().decode(b64uToBytes(parts[1])));
+  const project = env.FB_PROJECT || DEFAULT_FB_PROJECT;
+
+  if (!jwksCache.keys || Date.now() > jwksCache.exp) {
+    const r = await fetch('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com');
+    jwksCache = { keys: (await r.json()).keys, exp: Date.now() + 3600 * 1000 };
+  }
+  const jwk = jwksCache.keys.find((k) => k.kid === header.kid);
+  if (!jwk || header.alg !== 'RS256') throw new Error('unknown key');
+  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64uToBytes(parts[2]), enc.encode(parts[0] + '.' + parts[1]));
   const now = Math.floor(Date.now() / 1000);
-  const head = b64uStr(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const claim = b64uStr(JSON.stringify({
-    iss: env.FB_CLIENT_EMAIL, scope: 'https://www.googleapis.com/auth/datastore',
-    aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
-  }));
-  const pem = env.FB_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/-----[^-]+-----/g, '').replace(/\s+/g, '');
-  const der = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
-  const key = await crypto.subtle.importKey('pkcs8', der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
-  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(`${head}.${claim}`));
-  const r = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${head}.${claim}.${b64u(sig)}`,
-  });
-  const j = await r.json();
-  tokenCache = { t: j.access_token, exp: Date.now() + 3300 * 1000 };
-  return j.access_token;
+  if (!ok || payload.aud !== project || payload.iss !== 'https://securetoken.google.com/' + project ||
+      payload.exp < now || !payload.sub) throw new Error('invalid');
+  return payload.sub;
 }
 
-async function fsGet(env, path) {
-  const r = await fetch(`${FS(env)}/${path}`, { headers: { authorization: `Bearer ${await accessToken(env)}` } });
-  if (r.status === 404) return null;
-  if (!r.ok) throw new Error('fsGet ' + r.status);
-  return r.json();
-}
-const sv = (d, k) => d?.fields?.[k]?.stringValue;
-
-async function fsCommit(env, writes) {
-  const base = `projects/${env.FB_PROJECT}/databases/(default)/documents`;
-  const full = writes.map((w) => {
-    if (w.update) w.update.name = `${base}/${w.update.name}`;
-    if (w.delete) w.delete = `${base}/${w.delete}`;
-    return w;
-  });
-  const r = await fetch(`https://firestore.googleapis.com/v1/${`projects/${env.FB_PROJECT}/databases/(default)`}/documents:commit`, {
-    method: 'POST', headers: { authorization: `Bearer ${await accessToken(env)}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ writes: full }),
-  });
-  if (!r.ok) throw new Error('commit ' + r.status + ' ' + (await r.text()));
-}
-
-// ---------- منطق التوثيق ----------
-// يرجع نص النتيجة للمستخدم
-async function complete(env, code, provenPhone) {
-  code = String(code || '').toUpperCase();
-  if (!/^[A-Z0-9]{12}$/.test(code)) return 'الرمز غير صحيح.';
-  const v = await fsGet(env, `verifications/${code}`);
-  if (!v) return 'الرمز غير صحيح أو انتهت صلاحيته. ارجع للتطبيق وابدأ من جديد.';
-  const created = new Date(v.fields?.createdAt?.timestampValue || 0).getTime();
-  if (Date.now() - created > 30 * 60 * 1000) return 'انتهت صلاحية الرمز. ارجع للتطبيق وابدأ من جديد.';
-  const uid = sv(v, 'uid'), key = sv(v, 'phoneKey'), country = sv(v, 'country');
-  const claim = v.fields?.claim?.booleanValue === true;
-  if (!uid || !key) return 'طلب غير صالح.';
-  if (String(provenPhone).replace(/\D/g, '') !== key) return 'الرقم الذي أرسلت منه لا يطابق الرقم المطلوب توثيقه.';
-
-  const writes = [];
-  const ph = await fsGet(env, `phones/${key}`);
-  const owner = ph ? sv(ph, 'uid') : null;
-  if (owner && owner !== uid) {
-    const ou = await fsGet(env, `users/${owner}`);
-    if (ou?.fields?.phoneVerified?.booleanValue === true) return 'هذا الرقم موثّق لحساب آخر.';
-    if (!claim) return 'هذا الرقم محجوز لحساب آخر.';
-    // انقل الرقم من الحساب غير الموثّق: احذف حقول الرقم من ملفه
-    if (ou) writes.push({
-      update: { name: `users/${owner}`, fields: { phoneVerified: { booleanValue: false } } },
-      updateMask: { fieldPaths: ['phone', 'phoneKey', 'phoneCountry', 'phoneVerified'] },
-    });
-  }
-  writes.push({
-    update: { name: `phones/${key}`, fields: { uid: { stringValue: uid }, createdAt: { timestampValue: new Date().toISOString() } } },
-  });
-  writes.push({
-    update: { name: `users/${uid}`, fields: {
-      phone: { stringValue: '+' + key }, phoneKey: { stringValue: key },
-      phoneCountry: { stringValue: country || '' }, phoneVerified: { booleanValue: true } } },
-    updateMask: { fieldPaths: ['phone', 'phoneKey', 'phoneCountry', 'phoneVerified'] },
-  });
-  writes.push({ delete: `verifications/${code}` });
-  await fsCommit(env, writes);
-  return 'تم توثيق رقمك بنجاح ✅ ارجع إلى HaiApp.';
-}
-
-// ---------- تيليجرام ----------
-async function tg(env, method, body) {
-  return fetch(`https://api.telegram.org/bot${env.TG_TOKEN}/${method}`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-}
-async function onTelegram(env, update) {
-  const m = update.message;
-  if (!m) return;
-  const chat = m.chat.id;
-  if (m.text && m.text.startsWith('/start')) {
-    const code = (m.text.split(' ')[1] || '').toUpperCase();
-    if (!/^[A-Z0-9]{12}$/.test(code)) return tg(env, 'sendMessage', { chat_id: chat, text: 'ابدأ التوثيق من داخل تطبيق HaiApp.' });
-    await fsCommit(env, [{ update: { name: `tgPending/${chat}`, fields: {
-      code: { stringValue: code }, at: { timestampValue: new Date().toISOString() } } } }]);
-    return tg(env, 'sendMessage', {
-      chat_id: chat, text: 'اضغط الزر بالأسفل لمشاركة رقمك وإثبات ملكيته.',
-      reply_markup: { keyboard: [[{ text: '📱 مشاركة رقمي', request_contact: true }]], one_time_keyboard: true, resize_keyboard: true } });
-  }
-  if (m.contact) {
-    // يجب أن تكون جهة الاتصال هي المستخدم نفسه وليس رقماً آخر
-    if (m.contact.user_id !== m.from.id) return tg(env, 'sendMessage', { chat_id: chat, text: 'شارك رقمك أنت عبر الزر فقط.' });
-    const p = await fsGet(env, `tgPending/${chat}`);
-    if (!p) return tg(env, 'sendMessage', { chat_id: chat, text: 'ابدأ التوثيق من داخل التطبيق أولاً.' });
-    const msg = await complete(env, sv(p, 'code'), m.contact.phone_number);
-    await fsCommit(env, [{ delete: `tgPending/${chat}` }]);
-    return tg(env, 'sendMessage', { chat_id: chat, text: msg, reply_markup: { remove_keyboard: true } });
-  }
-}
-
-// ---------- واتساب (Meta Cloud API) ----------
-async function onWhatsApp(env, body) {
-  for (const e of body.entry || []) for (const c of e.changes || []) for (const m of c.value?.messages || []) {
-    if (m.type !== 'text') continue;
-    const mm = /HaiApp\s+([A-Za-z0-9]{12})/i.exec(m.text.body || '');
-    if (!mm) continue;
-    const msg = await complete(env, mm[1], m.from); // m.from = الرقم المرسِل (موثوق من واتساب)
-    await fetch(`https://graph.facebook.com/v20.0/${env.WA_PHONE_ID}/messages`, {
-      method: 'POST', headers: { authorization: `Bearer ${env.WA_TOKEN}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ messaging_product: 'whatsapp', to: m.from, type: 'text', text: { body: msg } }) });
-  }
-}
+const json = (obj, status = 200) =>
+  new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
 
 export default {
-  async fetch(req, env, ctx) {
+  async fetch(req, env) {
     const url = new URL(req.url);
-    try {
-      if (url.pathname === '/telegram' && req.method === 'POST') {
-        if (req.headers.get('x-telegram-bot-api-secret-token') !== env.TG_SECRET) return new Response('no', { status: 403 });
-        const u = await req.json();
-        ctx.waitUntil(onTelegram(env, u).catch((e) => console.log('tg', e)));
-        return new Response('ok');
+    if (url.pathname === '/agora-token' && req.method === 'GET') {
+      try {
+        const auth = req.headers.get('authorization') || '';
+        const uid = await verifyFirebase(env, auth.replace(/^Bearer\s+/i, ''));
+        const channel = url.searchParams.get('channel') || '';
+        if (!/^[A-Za-z0-9_-]{1,64}$/.test(channel)) return json({ error: 'bad channel' }, 400);
+        if (!env.AGORA_CERT) return json({ error: 'AGORA_CERT missing' }, 500);
+        const appId = env.AGORA_APP_ID || DEFAULT_APP_ID;
+        const token = await buildRtcToken(appId, env.AGORA_CERT, channel, TOKEN_SECONDS);
+        return json({ token, appId, uid });
+      } catch (e) {
+        return json({ error: 'unauthorized' }, 401);
       }
-      if (url.pathname === '/whatsapp') {
-        if (req.method === 'GET') {
-          return url.searchParams.get('hub.verify_token') === env.WA_VERIFY
-            ? new Response(url.searchParams.get('hub.challenge')) : new Response('no', { status: 403 });
-        }
-        const b = await req.json();
-        ctx.waitUntil(onWhatsApp(env, b).catch((e) => console.log('wa', e)));
-        return new Response('ok');
-      }
-    } catch (e) { console.log(e); }
-    return new Response('HaiApp verify worker');
+    }
+    return new Response('HaiApp calls worker');
   },
 };
