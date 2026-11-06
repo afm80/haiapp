@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 
 import 'agora_config.dart';
@@ -45,6 +48,20 @@ class _CallScreenState extends State<CallScreen> {
         if (mounted) setState(() => _error = 'يلزم السماح بالميكروفون${_video ? ' والكاميرا' : ''} لإجراء المكالمة');
         return;
       }
+      // تذكرة دخول مؤقتة من الخادم (بعد التحقق من حسابي)
+      var token = '';
+      if (kCallsWorkerUrl.isNotEmpty) {
+        final idToken = await FirebaseAuth.instance.currentUser!.getIdToken();
+        final r = await http
+            .get(Uri.parse('$kCallsWorkerUrl/agora-token?channel=${widget.room}'),
+                headers: {'Authorization': 'Bearer $idToken'})
+            .timeout(const Duration(seconds: 15));
+        if (r.statusCode != 200) {
+          if (mounted) setState(() => _error = 'تعذر الحصول على تصريح المكالمة (${r.statusCode})');
+          return;
+        }
+        token = (jsonDecode(r.body)['token'] ?? '').toString();
+      }
       final engine = createAgoraRtcEngine();
       _engine = engine;
       await engine.initialize(const RtcEngineContext(
@@ -78,7 +95,7 @@ class _CallScreenState extends State<CallScreen> {
       }
       _speaker = _video;
       await engine.joinChannel(
-        token: '',
+        token: token,
         channelId: widget.room,
         uid: 0,
         options: ChannelMediaOptions(
