@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'call_screen.dart';
+import 'call_state.dart';
 import 'chat_screen.dart';
 import 'utils.dart';
 
@@ -27,9 +28,18 @@ Future<void> openDirectChat(
 }
 
 /// المكالمات تتم داخل التطبيق عبر Agora
-Future<void> joinCall(BuildContext context, String room, bool video, String title) async {
-  await Navigator.push(context,
-      MaterialPageRoute(builder: (_) => CallScreen(room: room, video: video, title: title)));
+Future<void> joinCall(BuildContext context, String room, bool video, String title,
+    {String? callId, bool oneToOne = true}) async {
+  await Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => CallScreen(
+              room: room,
+              video: video,
+              title: title,
+              callId: callId,
+              caller: true,
+              oneToOne: oneToOne)));
 }
 
 Future<void> startCall(
@@ -38,10 +48,15 @@ Future<void> startCall(
   required String title,
   required bool video,
 }) async {
+  if (activeCalls > 0) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('أنت في مكالمة الآن')));
+    return;
+  }
   final uid = currentUser.uid;
   final room =
       'HaiApp-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(99999)}';
-  await fs.collection('calls').add({
+  final ref = await fs.collection('calls').add({
     'callerId': uid,
     'callerName': currentUser.displayName ?? '',
     'calleeIds': calleeIds,
@@ -53,7 +68,8 @@ Future<void> startCall(
     'createdAt': FieldValue.serverTimestamp(),
   });
   if (!context.mounted) return;
-  await joinCall(context, room, video, title);
+  await joinCall(context, room, video, title,
+      callId: ref.id, oneToOne: calleeIds.length == 1);
 }
 
 /// إرسال رسالة لمحادثة (يُستخدم في الإرسال العادي والتحويل)

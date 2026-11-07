@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'call_screen.dart';
+import 'call_state.dart';
 import 'contacts_service.dart';
 import 'utils.dart';
 import 'widgets.dart';
@@ -23,6 +24,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   Timer? _timeout;
   Timer? _buzz;
   bool _done = false;
+  StreamSubscription? _sub;
 
   DocumentReference<Map<String, dynamic>> get _ref => fs.collection('calls').doc(widget.callId);
   bool get _video => widget.data['type'] == 'video';
@@ -30,6 +32,18 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   @override
   void initState() {
     super.initState();
+    activeCalls++;
+    // المتصل ألغى المكالمة قبل ردي → أغلق الشاشة
+    _sub = _ref.snapshots().listen((s) {
+      final st = s.data()?['status'];
+      if (_done || !mounted) return;
+      if (st == 'cancelled' || st == 'missed' || st == 'ended') {
+        _done = true;
+        _timeout?.cancel();
+        _buzz?.cancel();
+        Navigator.pop(context);
+      }
+    }, onError: (_) {});
     _timeout = Timer(const Duration(seconds: 40), () {
       if (!mounted || _done) return;
       _done = true;
@@ -42,6 +56,8 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
 
   @override
   void dispose() {
+    activeCalls--;
+    _sub?.cancel();
     _timeout?.cancel();
     _buzz?.cancel();
     super.dispose();
@@ -58,7 +74,12 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     if (accept) {
       nav.pushReplacement(MaterialPageRoute(
           builder: (_) => CallScreen(
-              room: widget.data['room'] as String, video: _video, title: title)));
+              room: widget.data['room'] as String,
+              video: _video,
+              title: title,
+              callId: widget.callId,
+              caller: false,
+              oneToOne: (widget.data['calleeIds'] as List).length == 1)));
     } else {
       nav.pop();
     }

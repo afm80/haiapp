@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'actions.dart';
+import 'add_contact_screen.dart';
 import 'app_colors.dart';
 import 'contacts_service.dart';
 import 'find_user_screen.dart';
@@ -33,9 +33,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   Future<void> _newContact() async {
-    try {
-      await FlutterContacts.openExternalInsert();
-    } catch (_) {}
+    await Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const AddContactScreen()));
     if (mounted) setState(() => _reload++);
   }
 

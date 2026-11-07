@@ -10,6 +10,7 @@ import 'chat_actions.dart';
 import 'chats_tab.dart';
 import 'contacts_screen.dart';
 import 'contacts_service.dart';
+import 'call_state.dart';
 import 'incoming_call_screen.dart';
 import 'new_group_screen.dart';
 import 'settings_screen.dart';
@@ -82,6 +83,13 @@ class _HomeScreenState extends State<HomeScreen>
         final fresh =
             ts != null && DateTime.now().difference(ts.toDate()).inSeconds < 40;
         if (d['status'] == 'ringing' && fresh && mounted) {
+          // مشغول في مكالمة أخرى: رد تلقائي "مشغول" مثل واتساب
+          if (activeCalls > 0) {
+            if (List.from(d['calleeIds'] ?? const []).length == 1) {
+              ch.doc.reference.update({'status': 'busy'}).catchError((_) {});
+            }
+            continue;
+          }
           Navigator.push(
             context,
             MaterialPageRoute(

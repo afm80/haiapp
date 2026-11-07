@@ -16,7 +16,9 @@ import 'contacts_service.dart';
 import 'app_colors.dart';
 import 'audio_bubble.dart';
 import 'chat_wallpaper.dart';
+import 'add_contact_screen.dart';
 import 'forward_screen.dart';
+import 'image_preview_screen.dart';
 import 'info_screen.dart';
 import 'utils.dart';
 import 'widgets.dart';
@@ -139,9 +141,21 @@ class _ChatScreenState extends State<ChatScreen> {
         _snack('الصورة كبيرة، اختر صورة أصغر');
         return;
       }
+      if (!mounted) return;
+      final names = Map<String, dynamic>.from(_chat['names'] ?? {});
+      final other = _others.isEmpty ? '' : (names[_others.first] ?? '').toString();
+      final caption = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (_) => ImagePreviewScreen(
+                bytes: bytes, chatTitle: _isGroup ? (_chat['name'] ?? '').toString() : other)),
+      );
+      if (caption == null) return; // أُلغيت المعاينة
       setState(() => _sendingMedia = true);
       await _addMessage(
-          {'type': 'image', 'image': base64Encode(bytes), 'text': ''}, '📷 صورة');
+          {'type': 'image', 'image': base64Encode(bytes), 'text': caption},
+          caption.isEmpty ? '📷 صورة' : '📷 $caption');
     } catch (_) {
       _snack('تعذر إرسال الصورة');
     } finally {
@@ -412,6 +426,7 @@ class _ChatScreenState extends State<ChatScreen> {
             dark: dark,
             child: Column(
               children: [
+                _unsavedBanner(context),
                 Expanded(child: _messages(context)),
                 _replyBar(context),
                 _inputBar(context),
@@ -713,7 +728,29 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     Widget body;
-    if (isImage) {
+    if (isImage && (data['text'] ?? '').toString().isNotEmpty) {
+      body = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Base64Image(data['image'] as String),
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(6, 5, 6, 1),
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.end,
+              children: [
+                Text(data['text'].toString(), style: const TextStyle(fontSize: 16, height: 1.3)),
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 10, top: 4),
+                  child: meta(),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    } else if (isImage) {
       body = Stack(
         children: [
           _Base64Image(data['image'] as String),
@@ -927,6 +964,52 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// شريط "ليس في جهات اتصالك" لمحادثة فردية مع رقم غير محفوظ (مثل واتساب)
+  Widget _unsavedBanner(BuildContext context) {
+    if (_isGroup || _others.isEmpty) return const SizedBox.shrink();
+    final other = _others.first;
+    return ValueListenableBuilder<Map<String, String>?>(
+      valueListenable: ContactsService.names,
+      builder: (_, names, __) {
+        // names == null: لم تُمنح صلاحية الجهات، فلا نزعج المستخدم
+        if (names == null || (names[other] ?? '').isNotEmpty) return const SizedBox.shrink();
+        return UserBuilder(
+          uid: other,
+          builder: (ctx, u) {
+            final phone = (u['phone'] ?? '').toString();
+            if (phone.isEmpty) return const SizedBox.shrink();
+            final dark = Theme.of(ctx).brightness == Brightness.dark;
+            return Material(
+              color: dark ? const Color(0xFF1F2C34) : Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                child: Row(children: [
+                  const Icon(Icons.person_add_alt_1, size: 20, color: AppColors.accent),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text('هذا الرقم ليس في جهات اتصالك',
+                        style: TextStyle(fontSize: 14)),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      await Navigator.push(
+                          ctx,
+                          MaterialPageRoute(
+                              builder: (_) => AddContactScreen(
+                                  initialPhone: phone,
+                                  initialName: (u['name'] ?? '').toString())));
+                    },
+                    child: const Text('إضافة'),
+                  ),
+                ]),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _inputBar(BuildContext context) {
     if (_recording) return _recordingBar(context);
     if (_isGroup || _others.isEmpty) return _composer(context);
@@ -1028,6 +1111,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         icon: const Icon(Icons.attach_file),
                         onPressed: _editingId != null ? null : _attachSheet,
                       ),
+                    if (!showSend)
                     IconButton(
                       icon: const Icon(Icons.photo_camera_outlined),
                       onPressed:

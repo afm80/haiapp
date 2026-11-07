@@ -154,6 +154,17 @@ Future<void> claimPhoneAndSaveProfile(PhoneValue p, Map<String, dynamic> profile
   }
 }
 
+/// يحوّل رقماً دولياً (+9647...) إلى PhoneValue (أطول رمز دولة مطابق)
+PhoneValue? parseE164(String phone) {
+  final d = phone.replaceAll(RegExp(r'\D'), '');
+  Country? best;
+  for (final c in countries) {
+    if (d.startsWith(c.code) && (best == null || c.code.length > best.code.length)) best = c;
+  }
+  if (best == null) return null;
+  return PhoneValue(best, d.substring(best.code.length));
+}
+
 /// uid صاحب الرقم أو null إن لم يكن مسجلاً
 Future<String?> findUidByPhone(PhoneValue p) async {
   final d = await fs.collection('phones').doc(p.key).get();
@@ -164,7 +175,8 @@ Future<String?> findUidByPhone(PhoneValue p) async {
 class PhoneInput extends StatefulWidget {
   final ValueChanged<PhoneValue> onChanged;
   final bool enabled;
-  const PhoneInput({super.key, required this.onChanged, this.enabled = true});
+  final PhoneValue? initial;
+  const PhoneInput({super.key, required this.onChanged, this.enabled = true, this.initial});
 
   @override
   State<PhoneInput> createState() => _PhoneInputState();
@@ -172,7 +184,13 @@ class PhoneInput extends StatefulWidget {
 
 class _PhoneInputState extends State<PhoneInput> {
   final _ctrl = TextEditingController();
-  late Country _country = defaultCountry();
+  late Country _country = widget.initial?.country ?? defaultCountry();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initial != null) _ctrl.text = widget.initial!.national;
+  }
 
   void _emit() => widget.onChanged(PhoneValue(_country, nationalDigits(_ctrl.text)));
 

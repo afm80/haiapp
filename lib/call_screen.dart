@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 
 import 'agora_config.dart';
+import 'call_state.dart';
 import 'utils.dart';
 
 /// شاشة المكالمة (صوت/فيديو) داخل التطبيق عبر Agora
@@ -15,7 +17,18 @@ class CallScreen extends StatefulWidget {
   final String room;
   final bool video;
   final String title;
-  const CallScreen({super.key, required this.room, required this.video, required this.title});
+  final String? callId;
+  final bool caller;
+  final bool oneToOne;
+  const CallScreen({
+    super.key,
+    required this.room,
+    required this.video,
+    required this.title,
+    this.callId,
+    this.caller = false,
+    this.oneToOne = true,
+  });
 
   @override
   State<CallScreen> createState() => _CallScreenState();
@@ -31,13 +44,49 @@ class _CallScreenState extends State<CallScreen> {
   String? _error;
   Timer? _timer;
   int _seconds = 0;
+  String? _endNote; // رسالة نهاية المكالمة (رفض/مشغول/لا يرد)
+  bool _remoteEver = false;
+  bool _closing = false;
+  StreamSubscription? _callSub;
+  Timer? _ringTimeout;
+
+  DocumentReference<Map<String, dynamic>>? get _callRef =>
+      widget.callId == null ? null : FirebaseFirestore.instance.collection('calls').doc(widget.callId);
 
   bool get _video => widget.video;
 
   @override
   void initState() {
     super.initState();
+    activeCalls++;
     _init();
+    _watchCall();
+  }
+
+  void _watchCall() {
+    final ref = _callRef;
+    if (ref == null || !widget.caller) return;
+    // المتصل ينتظر ردّ الطرف الآخر: رفض / مشغول / لا يرد
+    _callSub = ref.snapshots().listen((s) {
+      final st = s.data()?['status'];
+      if (_remoteEver || !widget.oneToOne) return;
+      if (st == 'declined') _finishWith('رفض المكالمة');
+      if (st == 'busy') _finishWith('مشغول');
+      if (st == 'missed') _finishWith('لا يرد');
+    }, onError: (_) {});
+    _ringTimeout = Timer(const Duration(seconds: 45), () {
+      if (_remoteEver || _closing) return;
+      ref.update({'status': 'missed'}).catchError((_) {});
+      _finishWith('لا يرد');
+    });
+  }
+
+  Future<void> _finishWith(String note) async {
+    if (_closing || !mounted) return;
+    _closing = true;
+    setState(() => _endNote = note);
+    await Future.delayed(const Duration(milliseconds: 1800));
+    _hangUp(markStatus: false);
   }
 
   Future<void> _init() async {
@@ -79,10 +128,15 @@ class _CallScreenState extends State<CallScreen> {
           });
         },
         onUserJoined: (conn, uid, elapsed) {
+          _remoteEver = true;
+          _ringTimeout?.cancel();
           if (mounted && !_remotes.contains(uid)) setState(() => _remotes.add(uid));
         },
         onUserOffline: (conn, uid, reason) {
-          if (mounted) setState(() => _remotes.remove(uid));
+          if (!mounted) return;
+          setState(() => _remotes.remove(uid));
+          // مكالمة فردية: ينتهي كل شيء عندما يغادر الطرف الآخر
+          if (widget.oneToOne && _remotes.isEmpty && !_closing) _finishWith('انتهت المكالمة');
         },
         onError: (err, msg) {
           if (mounted && !_joined) setState(() => _error = 'تعذر الاتصال ($err)');
@@ -111,7 +165,12 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  Future<void> _hangUp() async {
+  Future<void> _hangUp({bool markStatus = true}) async {
+    if (markStatus && widget.caller && !_remoteEver) {
+      // أغلقتُ قبل أن يردّ الطرف الآخر = إلغاء
+      _callRef?.update({'status': 'cancelled'}).catchError((_) {});
+    }
+    _closing = true;
     _timer?.cancel();
     final e = _engine;
     _engine = null;
@@ -124,6 +183,9 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
+    activeCalls--;
+    _callSub?.cancel();
+    _ringTimeout?.cancel();
     _timer?.cancel();
     final e = _engine;
     _engine = null;
@@ -140,9 +202,12 @@ class _CallScreenState extends State<CallScreen> {
       );
 
   Widget _body() {
-    final status = _remotes.isEmpty
-        ? (_joined ? 'جارٍ الرنين...' : 'جارٍ الاتصال...')
-        : mmss(_seconds);
+    final status = _endNote ??
+        (_remotes.isEmpty
+            ? (widget.caller
+                ? (_joined ? 'جارٍ الرنين...' : 'جارٍ الاتصال...')
+                : 'جارٍ الاتصال...')
+            : mmss(_seconds));
     if (_video && _engine != null && _remotes.isNotEmpty) {
       return Stack(children: [
         Positioned.fill(
