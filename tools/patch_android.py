@@ -120,6 +120,7 @@ perms = ('    <uses-permission android:name="android.permission.INTERNET"/>\n'
          '    <uses-permission android:name="android.permission.CAMERA"/>\n'
          '    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n'
          '    <uses-permission android:name="android.permission.READ_CONTACTS"/>\n'
+         '    <uses-permission android:name="android.permission.WRITE_CONTACTS"/>\n'
          '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n'
          '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n'
          '    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>\n')
