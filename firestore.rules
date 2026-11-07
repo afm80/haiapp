@@ -74,6 +74,11 @@ service cloud.firestore {
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 
+    // رموز إشعارات الأجهزة: يقرؤها ويكتبها صاحبها فقط (الخادم يقرأها بصلاحيته الخاصة)
+    match /tokens/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
     // طلبات توثيق الرقم: ينشئها التطبيق فقط، ويقرؤها ويكمل التوثيق الخادم (Webhook)
     match /verifications/{code} {
       allow create: if signedIn()
