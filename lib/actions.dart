@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'call_screen.dart';
 import 'call_state.dart';
+import 'push.dart';
 import 'chat_screen.dart';
 import 'utils.dart';
 
@@ -67,6 +68,7 @@ Future<void> startCall(
     'status': 'ringing',
     'createdAt': FieldValue.serverTimestamp(),
   });
+  Push.notify({'kind': 'call', 'callId': ref.id, 'video': video});
   if (!context.mounted) return;
   await joinCall(context, room, video, title,
       callId: ref.id, oneToOne: calleeIds.length == 1);
@@ -97,4 +99,5 @@ Future<void> sendToChat(String chatId, List<String> participants,
     if (p != uid) upd['unread.$p'] = FieldValue.increment(1);
   }
   await chat.update(upd);
+  Push.notify({'kind': 'message', 'chatId': chatId, 'title': name, 'body': preview});
 }

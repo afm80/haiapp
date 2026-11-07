@@ -8,6 +8,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
 
 import 'contacts_service.dart';
+import 'push.dart';
 
 final fs = FirebaseFirestore.instance;
 User get currentUser => FirebaseAuth.instance.currentUser!;
@@ -73,6 +74,7 @@ Future<void> setPresence(bool online) async {
 
 Future<void> signOutUser() async {
   await setPresence(false);
+  await Push.clear();
   ContactsService.clear();
   try {
     await GoogleSignIn().signOut();

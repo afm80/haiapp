@@ -11,6 +11,7 @@ import 'chats_tab.dart';
 import 'contacts_screen.dart';
 import 'contacts_service.dart';
 import 'call_state.dart';
+import 'push.dart';
 import 'incoming_call_screen.dart';
 import 'new_group_screen.dart';
 import 'settings_screen.dart';
@@ -59,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (_foreground) setPresence(true);
     });
     _listenForCalls();
+    unawaited(Push.init());
   }
 
   @override
