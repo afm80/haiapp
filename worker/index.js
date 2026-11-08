@@ -154,7 +154,12 @@ async function handleNotify(req, env) {
   let data = {};
   let channelHigh = false;
 
-  if (body.kind === 'call') {
+  if (body.kind === 'test') {
+    recipients = [sender];
+    title = 'HaiApp';
+    text = 'اختبار الإشعارات ✅';
+    data = { kind: 'test' };
+  } else if (body.kind === 'call') {
     const call = await fsGet(sa, gtoken, 'calls/' + encodeURIComponent(clip(body.callId, 40)));
     if (!call || call.callerId !== sender) return json({ error: 'forbidden' }, 403);
     recipients = call.calleeIds || [];
@@ -173,9 +178,12 @@ async function handleNotify(req, env) {
   }
 
   let sent = 0;
+  let tokens = 0;
+  const errors = [];
   for (const uid of recipients.slice(0, 50)) {
     const t = await fsGet(sa, gtoken, 'tokens/' + encodeURIComponent(uid));
     for (const tok of (t && t.list) || []) {
+      tokens++;
       const msg = {
         message: {
           token: tok,
@@ -190,9 +198,10 @@ async function handleNotify(req, env) {
         body: JSON.stringify(msg),
       });
       if (r.ok) sent++;
+      else if (errors.length < 2) errors.push(r.status + ' ' + (await r.text()).slice(0, 300));
     }
   }
-  return json({ sent });
+  return json({ recipients: recipients.length, tokens, sent, errors });
 }
 
 const json = (obj, status = 200) =>
@@ -219,7 +228,7 @@ export default {
       try {
         return await handleNotify(req, env);
       } catch (e) {
-        return json({ error: 'failed' }, 400);
+        return json({ error: 'failed', detail: String((e && e.message) || e).slice(0, 200) }, 400);
       }
     }
     return new Response('HaiApp calls worker');
