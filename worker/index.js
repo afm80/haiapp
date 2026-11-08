@@ -84,6 +84,9 @@ async function verifyFirebase(env, idToken) {
 }
 
 // ---------- الإشعارات (FCM) ----------
+// fetch بمهلة 8 ثوانٍ حتى لا يعلق الخادم أبداً
+const tf = (url, opts = {}) => fetch(url, { ...opts, signal: AbortSignal.timeout(8000) });
+
 let saCache = { token: null, exp: 0 };
 const pemToBytes = (pem) => {
   const b64 = pem.replace(/-----[A-Z ]+-----/g, '').replace(/\s+/g, '');
@@ -109,7 +112,7 @@ async function googleToken(sa) {
   const key = await crypto.subtle.importKey('pkcs8', pemToBytes(sa.private_key),
     { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
   const sig = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, enc.encode(head + '.' + claim)));
-  const r = await fetch('https://oauth2.googleapis.com/token', {
+  const r = await tf('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') +
@@ -130,7 +133,7 @@ const fsVal = (v) => {
 };
 
 async function fsGet(sa, token, path) {
-  const r = await fetch(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/(default)/documents/${path}`,
+  const r = await tf(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/(default)/documents/${path}`,
     { headers: { authorization: 'Bearer ' + token } });
   if (!r.ok) return null;
   const d = await r.json();
@@ -139,14 +142,18 @@ async function fsGet(sa, token, path) {
   return out;
 }
 
+let stage = '';
 async function handleNotify(req, env) {
+  stage = 'verify';
   const auth = req.headers.get('authorization') || '';
   const sender = await verifyFirebase(env, auth.replace(/^Bearer\s+/i, ''));
   if (!env.FIREBASE_SA) return json({ error: 'FIREBASE_SA missing' }, 500);
   const sa = JSON.parse(env.FIREBASE_SA);
   const body = await req.json();
   const clip = (t, n) => String(t || '').slice(0, n);
+  stage = 'google-token';
   const gtoken = await googleToken(sa);
+  stage = 'firestore';
 
   let recipients = [];
   let title = clip(body.title, 60);
@@ -177,6 +184,7 @@ async function handleNotify(req, env) {
     data = { kind: 'message', chatId: clip(body.chatId, 40) };
   }
 
+  stage = 'send';
   let sent = 0;
   let tokens = 0;
   const errors = [];
@@ -192,7 +200,7 @@ async function handleNotify(req, env) {
           android: { priority: 'HIGH', ttl: channelHigh ? '45s' : '86400s' },
         },
       };
-      const r = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
+      const r = await tf(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
         method: 'POST',
         headers: { authorization: 'Bearer ' + gtoken, 'content-type': 'application/json' },
         body: JSON.stringify(msg),
@@ -228,7 +236,7 @@ export default {
       try {
         return await handleNotify(req, env);
       } catch (e) {
-        return json({ error: 'failed', detail: String((e && e.message) || e).slice(0, 200) }, 400);
+        return json({ error: 'failed', stage, detail: String((e && e.message) || e).slice(0, 200) }, 400);
       }
     }
     return new Response('HaiApp calls worker');
