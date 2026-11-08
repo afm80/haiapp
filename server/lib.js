@@ -174,7 +174,7 @@ async function notify(env, authHeader, body) {
       text = 'اختبار الإشعارات ✅';
       data = { kind: 'test' };
     } else if (body.kind === 'call') {
-      const call = await fsGet(sa, gtoken, 'calls/' + encodeURIComponent(clip(body.callId, 40)));
+      const call = await fsGet(sa, gtoken, 'calls/' + encodeURIComponent(clip(body.callId, 64)));
       if (!call || call.callerId !== sender) return [403, { error: 'forbidden' }];
       recipients = call.calleeIds || [];
       text = body.video ? 'مكالمة فيديو واردة' : 'مكالمة صوتية واردة';
@@ -182,14 +182,14 @@ async function notify(env, authHeader, body) {
       data = { kind: 'call' };
       isCall = true;
     } else {
-      const chat = await fsGet(sa, gtoken, 'chats/' + encodeURIComponent(clip(body.chatId, 40)));
+      const chat = await fsGet(sa, gtoken, 'chats/' + encodeURIComponent(clip(body.chatId, 128)));
       if (!chat || !(chat.participants || []).includes(sender)) return [403, { error: 'forbidden' }];
       recipients = (chat.participants || []).filter((u) => u !== sender);
       if (chat.groupName) {
         text = title + ': ' + text;
         title = chat.groupName;
       }
-      data = { kind: 'message', chatId: clip(body.chatId, 40) };
+      data = { kind: 'message', chatId: clip(body.chatId, 128) };
     }
 
     stage = 'send';
