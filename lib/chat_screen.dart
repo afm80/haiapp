@@ -791,12 +791,14 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     const r = Radius.circular(12);
-    final shape = BorderRadiusDirectional.only(
-      topStart: (tail && mine) ? Radius.zero : r,
-      topEnd: (tail && !mine) ? Radius.zero : r,
-      bottomStart: r,
-      bottomEnd: r,
+    // رسائلي دائماً على اليمين والواردة على اليسار (مثل واتساب)
+    final shape = BorderRadius.only(
+      topRight: (tail && mine) ? Radius.zero : r,
+      topLeft: (tail && !mine) ? Radius.zero : r,
+      bottomLeft: r,
+      bottomRight: r,
     );
+    final rtl = Directionality.of(context) == TextDirection.rtl;
 
     final bubble = GestureDetector(
       onLongPress: () => _options(d),
@@ -869,10 +871,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     return Align(
-      alignment: mine ? AlignmentDirectional.centerStart : AlignmentDirectional.centerEnd,
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: mine ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+        crossAxisAlignment: (mine == rtl) ? CrossAxisAlignment.start : CrossAxisAlignment.end,
         children: [
           bubble,
           if (reactions.isNotEmpty)

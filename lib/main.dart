@@ -4,10 +4,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app_colors.dart';
 import 'auth_screen.dart';
+import 'google_config.dart';
 import 'home_screen.dart';
 import 'profile_setup_screen.dart';
 import 'utils.dart';
@@ -79,8 +81,41 @@ class SplashScreen extends StatelessWidget {
 /// 1) غير مسجل: شاشة واحدة (ترحيب + دخول Google)
 /// 2) مسجل بدون ملف شخصي أو بدون رقم موبايل: إعداد الملف
 /// 3) مسجل وجاهز: الشاشة الرئيسية
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  // إن ضاعت الجلسة عند فتح التطبيق نحاول الدخول بصمت بحساب Google المحفوظ
+  bool _trying = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _silent();
+  }
+
+  Future<void> _silent() async {
+    try {
+      // ننتظر حالة الدخول المحفوظة أولاً
+      final first = await FirebaseAuth.instance.authStateChanges().first;
+      if (first == null) {
+        final gs = GoogleSignIn(scopes: ['email'], serverClientId: kGoogleWebClientId);
+        final acc = await gs.signInSilently();
+        if (acc != null) {
+          final auth = await acc.authentication;
+          if (auth.idToken != null) {
+            await FirebaseAuth.instance.signInWithCredential(GoogleAuthProvider.credential(
+                accessToken: auth.accessToken, idToken: auth.idToken));
+          }
+        }
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _trying = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +126,7 @@ class AuthGate extends StatelessWidget {
           return const SplashScreen();
         }
         final user = snap.data;
-        if (user == null) return const LoggedOutFlow();
+        if (user == null) return _trying ? const SplashScreen() : const LoggedOutFlow();
         return ProfileGate(uid: user.uid);
       },
     );

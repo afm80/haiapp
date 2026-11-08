@@ -62,4 +62,25 @@ class Push {
       } catch (_) {}
     }();
   }
+
+  /// اختبار: يرسل إشعاراً لنفسك ويعيد نتيجة مفهومة
+  static Future<String> test() async {
+    final lines = <String>[];
+    try {
+      final t = await FirebaseMessaging.instance.getToken();
+      lines.add(t == null ? '❌ لا يوجد رمز للجهاز (تحقق من إذن الإشعارات)' : '✅ رمز الجهاز موجود');
+      if (t != null) await _save(t);
+      final idToken = await FirebaseAuth.instance.currentUser!.getIdToken();
+      final r = await http
+          .post(Uri.parse('$kCallsWorkerUrl/notify'),
+              headers: {'Authorization': 'Bearer $idToken', 'content-type': 'application/json'},
+              body: jsonEncode({'kind': 'test'}))
+          .timeout(const Duration(seconds: 20));
+      lines.add('رد الخادم (${r.statusCode}):');
+      lines.add(r.body);
+    } catch (e) {
+      lines.add('خطأ: $e');
+    }
+    return lines.join('\n');
+  }
 }
