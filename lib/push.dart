@@ -66,20 +66,36 @@ class Push {
   /// اختبار: يرسل إشعاراً لنفسك ويعيد نتيجة مفهومة
   static Future<String> test() async {
     final lines = <String>[];
+    final sw = Stopwatch()..start();
+    String ms() => '(${sw.elapsedMilliseconds}ms)';
     try {
       final t = await FirebaseMessaging.instance.getToken();
-      lines.add(t == null ? '❌ لا يوجد رمز للجهاز (تحقق من إذن الإشعارات)' : '✅ رمز الجهاز موجود');
-      if (t != null) await _save(t);
+      lines.add(t == null ? '❌ لا يوجد رمز للجهاز' : '✅ رمز الجهاز موجود');
+      if (t != null) {
+        try {
+          await _save(t).timeout(const Duration(seconds: 10));
+          lines.add('✅ حفظ الرمز في القاعدة ${ms()}');
+        } catch (e) {
+          lines.add('❌ حفظ الرمز في القاعدة فشل: $e');
+        }
+      }
       final idToken = await FirebaseAuth.instance.currentUser!.getIdToken();
+      lines.add('✅ توكن الحساب ${ms()}');
+      try {
+        final r0 = await http.get(Uri.parse(kCallsWorkerUrl)).timeout(const Duration(seconds: 10));
+        lines.add('✅ الوصول للخادم (${r0.statusCode}) ${ms()}');
+      } catch (e) {
+        lines.add('❌ الوصول للخادم فشل: $e');
+      }
       final r = await http
           .post(Uri.parse('$kCallsWorkerUrl/notify'),
               headers: {'Authorization': 'Bearer $idToken', 'content-type': 'application/json'},
               body: jsonEncode({'kind': 'test'}))
-          .timeout(const Duration(seconds: 20));
-      lines.add('رد الخادم (${r.statusCode}):');
+          .timeout(const Duration(seconds: 40));
+      lines.add('رد الخادم (${r.statusCode}) ${ms()}:');
       lines.add(r.body);
     } catch (e) {
-      lines.add('خطأ: $e');
+      lines.add('❌ خطأ: $e');
     }
     return lines.join('\n');
   }
