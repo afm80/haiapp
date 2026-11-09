@@ -27,9 +27,18 @@ class _PatternPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size,
-        Paint()..color = dark ? const Color(0xFF0B141A) : const Color(0xFFEFE7DD));
-    final ink = dark ? const Color(0xFF1C2D36) : const Color(0xFFDCD0BF);
+    final rect = Offset.zero & size;
+    canvas.drawRect(
+        rect,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: dark
+                ? const [Color(0xFF14161C), Color(0xFF1F2430)]
+                : const [Color(0xFFF6F5F3), Color(0xFFE6E4E0)],
+          ).createShader(rect));
+    final ink = dark ? const Color(0xFF2E3544) : const Color(0xFFD3D0CA);
     final p = Paint()
       ..color = ink
       ..style = PaintingStyle.stroke

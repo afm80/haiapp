@@ -48,7 +48,7 @@ class _ImagePreviewScreenState extends State<ImagePreviewScreen> {
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1F2C34),
+                    color: const Color(0xFF1F2430),
                     borderRadius: BorderRadius.circular(26),
                   ),
                   child: TextField(

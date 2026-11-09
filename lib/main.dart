@@ -25,9 +25,24 @@ ThemeData _theme(Brightness b) {
   final light = b == Brightness.light;
   return ThemeData(
     useMaterial3: true,
-    textTheme: GoogleFonts.cairoTextTheme(ThemeData(brightness: b).textTheme),
-    colorScheme: ColorScheme.fromSeed(seedColor: AppColors.accent, brightness: b)
-        .copyWith(primary: AppColors.accent, onPrimary: Colors.white),
+    scaffoldBackgroundColor: light ? AppColors.bgLight : AppColors.bgDark,
+    textTheme: GoogleFonts.cairoTextTheme(ThemeData(brightness: b).textTheme).apply(
+      bodyColor: light ? AppColors.textLight : AppColors.textDark,
+      displayColor: light ? AppColors.textLight : AppColors.textDark,
+    ),
+    iconTheme: IconThemeData(color: light ? AppColors.textLight : AppColors.textDark),
+    colorScheme: ColorScheme.fromSeed(seedColor: AppColors.accent, brightness: b).copyWith(
+      primary: AppColors.accent,
+      onPrimary: Colors.white,
+      surface: light ? AppColors.bgLight : AppColors.bgDark,
+      onSurface: light ? AppColors.textLight : AppColors.textDark,
+      onSurfaceVariant: light ? AppColors.mutedLight : AppColors.mutedDark,
+      surfaceContainerLowest: light ? AppColors.bgLight : AppColors.bgDark,
+      surfaceContainerLow: light ? AppColors.bgLight : AppColors.bgDark,
+      surfaceContainer: light ? const Color(0xFFEDEBE8) : AppColors.panelDark,
+      surfaceContainerHigh: light ? const Color(0xFFE6E4E0) : const Color(0xFF262B36),
+      surfaceContainerHighest: light ? const Color(0xFFE0DEDA) : const Color(0xFF2E3544),
+    ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
           backgroundColor: AppColors.accent, foregroundColor: Colors.white),
@@ -37,7 +52,7 @@ ThemeData _theme(Brightness b) {
           backgroundColor: AppColors.accent, foregroundColor: Colors.white),
     ),
     appBarTheme: AppBarTheme(
-      backgroundColor: light ? AppColors.primary : AppColors.darkBar,
+      backgroundColor: AppColors.primary,
       foregroundColor: Colors.white,
       scrolledUnderElevation: 0,
     ),

@@ -215,7 +215,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         _pickImage(ImageSource.camera);
                       },
                       child: Container(
-                        color: const Color(0xFF1F2C34),
+                        color: const Color(0xFF1F2430),
                         child: const Icon(Icons.photo_camera, color: Colors.white, size: 40),
                       ),
                     );
@@ -702,7 +702,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: FloatingActionButton.small(
                   heroTag: null,
                   elevation: 2,
-                  backgroundColor: dark ? const Color(0xFF202C33) : Colors.white,
+                  backgroundColor: dark ? const Color(0xFF262B36) : Colors.white,
                   foregroundColor: dark ? Colors.white70 : const Color(0xFF54656F),
                   onPressed: () => _scroll.animateTo(0,
                       duration: const Duration(milliseconds: 250), curve: Curves.easeOut),
@@ -976,7 +976,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
-                  color: dark ? const Color(0xFF202C33) : Colors.white,
+                  color: dark ? const Color(0xFF262B36) : Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: const [
                     BoxShadow(color: Colors.black26, blurRadius: 1, offset: Offset(0, 1))
@@ -997,7 +997,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_replyText == null && _editingId == null) return const SizedBox.shrink();
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: dark ? const Color(0xFF1F2C34) : const Color(0xFFF0F2F5),
+      color: dark ? const Color(0xFF1F2430) : const Color(0xFFF0F2F5),
       padding: const EdgeInsets.fromLTRB(10, 8, 4, 4),
       child: Row(
         children: [
@@ -1075,7 +1075,7 @@ class _ChatScreenState extends State<ChatScreen> {
             if (phone.isEmpty) return const SizedBox.shrink();
             final dark = Theme.of(ctx).brightness == Brightness.dark;
             return Material(
-              color: dark ? const Color(0xFF1F2C34) : Colors.white,
+              color: dark ? const Color(0xFF1F2430) : Colors.white,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 child: Row(children: [
