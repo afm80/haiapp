@@ -19,6 +19,7 @@ import 'chat_wallpaper.dart';
 import 'add_contact_screen.dart';
 import 'forward_screen.dart';
 import 'image_preview_screen.dart';
+import 'image_viewer.dart';
 import 'info_screen.dart';
 import 'utils.dart';
 import 'widgets.dart';
@@ -54,6 +55,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _typing = false;
   Timer? _typingTimer;
   bool _searching = false;
+  bool _onlyStarred = false;
   String _q = '';
   bool _recording = false;
   int _recSecs = 0;
@@ -265,6 +267,32 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _messageInfo(Map<String, dynamic> data) {
+    final ts = (data['createdAt'] as Timestamp?)?.toDate();
+    final readBy = List<String>.from(data['readBy'] ?? const []);
+    final names = Map<String, dynamic>.from(_chat['names'] ?? {});
+    final readers = _others.where(readBy.contains).toList();
+    final waiting = _others.where((u) => !readBy.contains(u)).toList();
+    String n(String u) => (names[u] ?? 'مستخدم').toString();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('معلومات الرسالة'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('أُرسلت: ${ts == null ? '...' : '${dayLabel(ts)} ${hhmm(ts)}'}'),
+            const SizedBox(height: 10),
+            if (readers.isNotEmpty) Text('قرأها: ${readers.map(n).join('، ')}'),
+            if (waiting.isNotEmpty) Text('لم يقرأها بعد: ${waiting.map(n).join('، ')}'),
+          ],
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إغلاق'))],
+      ),
+    );
+  }
+
   void _options(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
     final mine = data['senderId'] == _uid;
@@ -308,6 +336,48 @@ class _ChatScreenState extends State<ChatScreen> {
                   });
                 },
               ),
+              if (type == 'image') ...[
+                ListTile(
+                  leading: const Icon(Icons.download),
+                  title: const Text('حفظ في المعرض'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    saveImageToGallery(context, base64Decode(data['image'] as String));
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.share),
+                  title: const Text('مشاركة'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    shareImage(context, base64Decode(data['image'] as String));
+                  },
+                ),
+              ],
+              ListTile(
+                leading: Icon(List<String>.from(data['starredBy'] ?? const []).contains(_uid)
+                    ? Icons.star_border
+                    : Icons.star),
+                title: Text(List<String>.from(data['starredBy'] ?? const []).contains(_uid)
+                    ? 'إلغاء التمييز'
+                    : 'تمييز بنجمة'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  final on = List<String>.from(data['starredBy'] ?? const []).contains(_uid);
+                  doc.reference.update({
+                    'starredBy': on ? FieldValue.arrayRemove([_uid]) : FieldValue.arrayUnion([_uid]),
+                  });
+                },
+              ),
+              if (mine)
+                ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: const Text('معلومات الرسالة'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _messageInfo(data);
+                  },
+                ),
               if (type == 'text')
                 ListTile(
                   leading: const Icon(Icons.copy),
@@ -508,6 +578,10 @@ class _ChatScreenState extends State<ChatScreen> {
           onSelected: (v) {
             if (v == 'search') {
               setState(() => _searching = true);
+            } else if (v == 'starred') {
+              setState(() => _onlyStarred = !_onlyStarred);
+            } else if (v == 'mute') {
+              toggleChatFlag({widget.chatId}, 'mutedBy');
             } else if (v == 'delete') {
               deleteChatsConfirm(context, {widget.chatId}).then((done) {
                 if (done && mounted) Navigator.pop(context);
@@ -516,10 +590,18 @@ class _ChatScreenState extends State<ChatScreen> {
               _openInfo();
             }
           },
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'search', child: Text('بحث')),
-            PopupMenuItem(value: 'info', child: Text('معلومات')),
-            PopupMenuItem(value: 'delete', child: Text('حذف المحادثة')),
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'search', child: Text('بحث')),
+            PopupMenuItem(
+                value: 'starred',
+                child: Text(_onlyStarred ? 'عرض كل الرسائل' : 'الرسائل المميّزة ⭐')),
+            PopupMenuItem(
+                value: 'mute',
+                child: Text(List<String>.from(_chat['mutedBy'] ?? const []).contains(_uid)
+                    ? 'إلغاء كتم الإشعارات'
+                    : 'كتم الإشعارات')),
+            const PopupMenuItem(value: 'info', child: Text('معلومات')),
+            const PopupMenuItem(value: 'delete', child: Text('حذف المحادثة')),
           ],
         ),
       ],
@@ -545,13 +627,18 @@ class _ChatScreenState extends State<ChatScreen> {
               return t == null || t.isAfter(cleared);
             })
             .toList();
+        if (_onlyStarred) {
+          docs = docs
+              .where((d) => List<String>.from(d.data()['starredBy'] ?? const []).contains(_uid))
+              .toList();
+        }
         if (_searching && _q.isNotEmpty) {
           docs = docs.where((d) => (d.data()['text'] ?? '').toString().contains(_q)).toList();
         }
         DateTime dt(QueryDocumentSnapshot<Map<String, dynamic>> d) =>
             (d.data()['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
         if (docs.isEmpty) {
-          return Center(child: Text(_searching ? 'لا نتائج' : 'ابدأ المحادثة 👋'));
+          return Center(child: Text(_onlyStarred ? 'لا رسائل مميّزة' : (_searching ? 'لا نتائج' : 'ابدأ المحادثة 👋')));
         }
         final list = ListView.builder(
           controller: _scroll,
@@ -679,6 +766,11 @@ class _ChatScreenState extends State<ChatScreen> {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (List<String>.from(data['starredBy'] ?? const []).contains(_uid))
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 3),
+              child: Icon(Icons.star, size: 12, color: c),
+            ),
           if (edited) Text('معدّلة ', style: TextStyle(fontSize: 11, color: c)),
           Text(time, style: TextStyle(fontSize: 11, color: c)),
           if (mine) ...[
@@ -1256,13 +1348,7 @@ class _Base64ImageState extends State<_Base64Image> {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => Scaffold(
-            backgroundColor: Colors.black,
-            appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
-            body: Center(child: InteractiveViewer(child: Image.memory(_bytes))),
-          ),
-        ),
+        MaterialPageRoute(builder: (_) => ImageViewerScreen(bytes: _bytes)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(9),
