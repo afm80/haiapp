@@ -124,6 +124,7 @@ perms = ('    <uses-permission android:name="android.permission.INTERNET"/>\n'
          '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n'
          '    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>\n'
          '    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>\n'
+         '    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>\n'
          '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n'
          '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n'
          '    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>\n')
