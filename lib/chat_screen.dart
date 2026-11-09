@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:photo_manager/photo_manager.dart';
 import 'package:record/record.dart';
 
 import 'actions.dart';
@@ -169,121 +168,6 @@ class _ChatScreenState extends State<ChatScreen> {
     } finally {
       if (mounted) setState(() => _sendingMedia = false);
     }
-  }
-
-  /// مثل واتساب: الكاميرا + صور المعرض في شبكة واحدة
-  Future<void> _cameraSheet() async {
-    List<AssetEntity> assets = [];
-    try {
-      final perm = await PhotoManager.requestPermissionExtend();
-      if (perm.hasAccess) {
-        final paths = await PhotoManager.getAssetPathList(onlyAll: true, type: RequestType.image);
-        if (paths.isNotEmpty) assets = await paths.first.getAssetListPaged(page: 0, size: 90);
-      }
-    } catch (_) {}
-    if (!mounted) return;
-    if (assets.isEmpty) {
-      _pickImage(ImageSource.camera);
-      return;
-    }
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.black,
-      builder: (ctx) => SizedBox(
-        height: MediaQuery.of(ctx).size.height * 0.7,
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-            Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: Colors.white38, borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 8),
-            Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(2),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3, mainAxisSpacing: 2, crossAxisSpacing: 2),
-                itemCount: assets.length + 1,
-                itemBuilder: (_, i) {
-                  if (i == 0) {
-                    return InkWell(
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        _pickImage(ImageSource.camera);
-                      },
-                      child: Container(
-                        color: const Color(0xFF1F2430),
-                        child: const Icon(Icons.photo_camera, color: Colors.white, size: 40),
-                      ),
-                    );
-                  }
-                  final a = assets[i - 1];
-                  return InkWell(
-                    onTap: () async {
-                      Navigator.pop(ctx);
-                      final b = await a.thumbnailDataWithSize(
-                          const ThumbnailSize(1024, 1024), quality: 60);
-                      if (b != null) await _sendImageBytes(b);
-                    },
-                    child: FutureBuilder<Uint8List?>(
-                      future: a.thumbnailDataWithSize(const ThumbnailSize(250, 250)),
-                      builder: (_, snap) => snap.data == null
-                          ? Container(color: Colors.white10)
-                          : Image.memory(snap.data!, fit: BoxFit.cover),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _attachSheet() {
-    Widget item(IconData icon, Color color, String label, VoidCallback onTap) => InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircleAvatar(
-                    radius: 28,
-                    backgroundColor: color,
-                    child: Icon(icon, color: Colors.white, size: 26)),
-                const SizedBox(height: 6),
-                Text(label, style: const TextStyle(fontSize: 12)),
-              ],
-            ),
-          ),
-        );
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              item(Icons.photo_library, const Color(0xFFAC44CF), 'المعرض', () {
-                Navigator.pop(ctx);
-                _pickImage(ImageSource.gallery);
-              }),
-              item(Icons.photo_camera, const Color(0xFFD3396D), 'الكاميرا', () {
-                Navigator.pop(ctx);
-                _pickImage(ImageSource.camera);
-              }),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   // ---------- الرسائل الصوتية ----------
@@ -855,6 +739,12 @@ class _ChatScreenState extends State<ChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(data['text'] ?? '', style: const TextStyle(fontSize: 72, height: 1.15)),
+          if ((data['caption'] ?? '').toString().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text(data['caption'].toString(),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            ),
           meta(),
         ],
       );
@@ -1163,30 +1053,56 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _emojiSheet() {
     const emojis = [
-      '😀','😁','😂','🤣','😊','😍','😘','😎','🤔','😢','😭','😡','👍','👎','👏','🙏',
-      '💪','🔥','❤️','💔','🎉','🌹','🌸','⭐','✅','❌','😴','🤝','👋','🙌','😇','🥰',
-      '😉','😋','😜','🤗','😏','😒','😔','😱','🤯','😷','🤒','🥳','😤','🙄','😬','🤩',
+      // وجوه
+      '😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰',
+      '😘','😗','😙','😚','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨',
+      '😐','😑','😶','😏','😒','🙄','😬','😮‍💨','🤥','😌','😔','😪','🤤','😴','😷','🤒',
+      '🤕','🤢','🤮','🥵','🥶','🥴','😵','🤯','🤠','🥳','😎','🤓','🧐','😕','😟','🙁',
+      '😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞',
+      '😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','💩','🤡','👻','👽','🤖',
+      // أيدي وأشخاص
+      '👍','👎','👌','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','👇','☝️','✋','🤚','🖐️',
+      '👋','🤝','👏','🙌','👐','🙏','💪','🦾','🖕','✍️','🤳','💅','👀','👁️','👅','👄',
+      // قلوب ورموز
+      '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖',
+      '💘','💝','💯','💢','💥','💫','💦','💨','🔥','⭐','🌟','✨','⚡','☀️','🌙','🌈',
+      // طبيعة وطعام وأشياء
+      '🌹','🌸','🌺','🌻','🌼','🌷','🍀','🌴','🐱','🐶','🦁','🐴','🦋','🐝','🍎','🍉',
+      '🍕','🍔','🍟','☕','🍫','🎂','🎁','🎉','🎊','🎈','🎵','🎧','⚽','🚗','✈️','🏠',
+      '📱','💻','📷','💡','💰','🔑','🔒','📌','📞','✅','❌','⚠️','❓','❗','➕','➖',
     ];
-    const stickers = [
+    // (رمز، تعليق) ملصقات برمز كبير وتعليق قصير
+    const captioned = [
+      ['❤️', 'أحبك'], ['😍', 'يا سلام'], ['🥰', 'اشتقت لك'], ['😘', 'تسلم'],
+      ['🙏', 'شكراً'], ['🤝', 'اتفقنا'], ['👍', 'تمام'], ['👏', 'أحسنت'],
+      ['💪', 'قوي'], ['🔥', 'نار'], ['🎉', 'مبروك'], ['🎂', 'عيد ميلاد سعيد'],
+      ['🌹', 'لك وردة'], ['☕', 'قهوة؟'], ['😴', 'تصبح على خير'], ['☀️', 'صباح الخير'],
+      ['🌙', 'مساء الخير'], ['😂', 'ههههه'], ['🤣', 'مت ضحكاً'], ['😭', 'حزين'],
+      ['😡', 'زعلان'], ['🤔', 'ممم؟'], ['🙄', 'ياربي'], ['😎', 'أنا بخير'],
+      ['👋', 'مرحباً'], ['🤗', 'تعال'], ['😱', 'مستحيل'], ['🥳', 'نحتفل'],
+      ['✅', 'تم'], ['⏳', 'لحظة'], ['📞', 'اتصل بي'], ['🚗', 'في الطريق'],
+      ['🏠', 'وصلت'], ['🍕', 'جوعان'], ['🤝', 'أبشر'], ['🙌', 'الحمد لله'],
+    ];
+    const plain = [
       '😂','🤣','😍','🥰','😘','😭','😡','😱','🤯','🥳','😎','🤩','😴','🤔','🙄','😇',
       '👍','👏','🙏','💪','🔥','❤️','💔','🎉','🌹','🌸','🌻','🎂','🎁','☕','🍕','🚀',
+      '🐱','🐶','🦁','🦋','🌈','⭐','💯','👑','💎','🎈','🍫','🍉',
     ];
-    Widget grid(List<String> list, double size, int cols, void Function(String) onTap) =>
-        GridView.count(
-          crossAxisCount: cols,
+    Widget emojiGrid(void Function(String) onTap) => GridView.count(
+          crossAxisCount: 8,
           padding: const EdgeInsets.all(12),
           children: [
-            for (final e in list)
+            for (final e in emojis)
               InkWell(
                 onTap: () => onTap(e),
-                child: Center(child: Text(e, style: TextStyle(fontSize: size))),
+                child: Center(child: Text(e, style: const TextStyle(fontSize: 28))),
               ),
           ],
         );
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SizedBox(
-        height: MediaQuery.of(ctx).size.height * 0.45,
+        height: MediaQuery.of(ctx).size.height * 0.5,
         child: DefaultTabController(
           length: 2,
           child: Column(
@@ -1195,7 +1111,7 @@ class _ChatScreenState extends State<ChatScreen> {
               Expanded(
                 child: TabBarView(
                   children: [
-                    grid(emojis, 28, 8, (e) {
+                    emojiGrid((e) {
                       final t = _ctrl.text;
                       final sel = _ctrl.selection;
                       final at = (sel.isValid && sel.start >= 0) ? sel.start : t.length;
@@ -1203,10 +1119,39 @@ class _ChatScreenState extends State<ChatScreen> {
                       _ctrl.selection = TextSelection.collapsed(offset: at + e.length);
                       _onChanged(_ctrl.text);
                     }),
-                    grid(stickers, 48, 4, (e) {
-                      Navigator.pop(ctx);
-                      _addMessage({'type': 'sticker', 'text': e}, '$e ملصق');
-                    }),
+                    GridView.count(
+                      crossAxisCount: 4,
+                      padding: const EdgeInsets.all(12),
+                      mainAxisSpacing: 6,
+                      children: [
+                        for (final c in captioned)
+                          InkWell(
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _addMessage({'type': 'sticker', 'text': c[0], 'caption': c[1]},
+                                  '${c[0]} ${c[1]}');
+                            },
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(c[0], style: const TextStyle(fontSize: 38)),
+                                Text(c[1],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                        for (final e in plain)
+                          InkWell(
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _addMessage({'type': 'sticker', 'text': e}, '$e ملصق');
+                            },
+                            child: Center(child: Text(e, style: const TextStyle(fontSize: 44))),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -1264,15 +1209,15 @@ class _ChatScreenState extends State<ChatScreen> {
                       )
                     else
                       IconButton(
-                        icon: Transform.rotate(
-                            angle: -0.8, child: const Icon(Icons.attach_file)),
-                        onPressed: _editingId != null ? null : _attachSheet,
+                        icon: const Icon(Icons.image_outlined),
+                        onPressed:
+                            _editingId != null ? null : () => _pickImage(ImageSource.gallery),
                       ),
                     if (!showSend)
                     IconButton(
                       icon: const Icon(Icons.photo_camera_outlined),
                       onPressed:
-                          _editingId != null ? null : _cameraSheet,
+                          _editingId != null ? null : () => _pickImage(ImageSource.camera),
                     ),
                   ],
                 ),
