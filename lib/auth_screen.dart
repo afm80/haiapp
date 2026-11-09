@@ -75,8 +75,17 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    const onDark = Colors.white;
     return Scaffold(
-      body: SafeArea(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF7A0A3C), Color(0xFF5F012B), Color(0xFF2E0115)],
+          ),
+        ),
+        child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -88,19 +97,22 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               const SizedBox(height: 28),
               Text('مرحباً بك في HaiApp',
-                  style: t.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  style: t.headlineMedium
+                      ?.copyWith(fontWeight: FontWeight.bold, color: onDark)),
               const SizedBox(height: 10),
               Text('تواصل مع أصدقائك وعائلتك بسهولة وخصوصية،\nرسائل وصور ومجموعات وحالات ومكالمات.',
-                  textAlign: TextAlign.center, style: t.bodyLarge),
+                  textAlign: TextAlign.center,
+                  style: t.bodyLarge?.copyWith(color: Colors.white70)),
               const Spacer(),
               if (_error != null) ...[
                 SelectableText(_error!,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                    style: const TextStyle(color: Color(0xFFFFB4C8))),
                 const SizedBox(height: 12),
               ],
               Text('بالمتابعة فأنت توافق على شروط الاستخدام وسياسة الخصوصية.',
-                  textAlign: TextAlign.center, style: t.bodySmall),
+                  textAlign: TextAlign.center,
+                  style: t.bodySmall?.copyWith(color: Colors.white60)),
               const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
@@ -123,6 +135,7 @@ class _AuthScreenState extends State<AuthScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

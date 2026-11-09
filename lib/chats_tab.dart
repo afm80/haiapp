@@ -112,13 +112,27 @@ class _ChatsTabState extends State<ChatsTab> {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(32),
-                child: Text(
-                  q.isNotEmpty
-                      ? 'لا نتائج'
-                      : (widget.archived
-                          ? 'لا توجد محادثات مؤرشفة'
-                          : 'ما عندك محادثات بعد.\nاضغط على زر المحادثة لبدء أول محادثة.'),
-                  textAlign: TextAlign.center,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Opacity(
+                      opacity: 0.9,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(28),
+                        child: Image.asset('assets/icon/icon.png', width: 96, height: 96),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      q.isNotEmpty
+                          ? 'لا نتائج'
+                          : (widget.archived
+                              ? 'لا توجد محادثات مؤرشفة'
+                              : 'ما عندك محادثات بعد.\nاضغط على زر المحادثة لبدء أول محادثة.'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -212,7 +226,7 @@ class _ChatsTabState extends State<ChatsTab> {
           selectedTileColor: AppColors.primary.withAlpha(35),
           leading: Stack(
             children: [
-              Avatar(photo: photo, name: title, isGroup: isGroup, radius: 26),
+              Avatar(photo: photo, name: title, isGroup: isGroup, radius: 28),
               if (selected)
                 const Positioned(
                   bottom: 0,
@@ -245,6 +259,8 @@ class _ChatsTabState extends State<ChatsTab> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (_flag(d, 'mutedBy'))
+                    Icon(Icons.notifications_off, size: 16, color: Theme.of(context).hintColor),
                   if (pinned)
                     Icon(Icons.push_pin, size: 16, color: Theme.of(context).hintColor),
                   if (unread > 0)
@@ -267,7 +283,19 @@ class _ChatsTabState extends State<ChatsTab> {
               _toggle(doc.id);
             } else {
               Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => ChatScreen(chatId: doc.id)));
+                  context,
+                  PageRouteBuilder(
+                    transitionDuration: const Duration(milliseconds: 220),
+                    pageBuilder: (_, __, ___) => ChatScreen(chatId: doc.id),
+                    transitionsBuilder: (_, anim, __, child) => FadeTransition(
+                      opacity: anim,
+                      child: SlideTransition(
+                        position: Tween(begin: const Offset(0.06, 0), end: Offset.zero)
+                            .animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+                        child: child,
+                      ),
+                    ),
+                  ));
             }
           },
           onLongPress: () => widget.selection != null ? _toggle(doc.id) : _menu(doc),
