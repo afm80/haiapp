@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'blocked_screen.dart';
 import 'change_phone_screen.dart';
 import 'profile_setup_screen.dart';
-import 'push.dart';
 import 'username_screen.dart';
 import 'utils.dart';
 import 'verify_config.dart';
@@ -133,26 +132,6 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('المحظورون'),
             onTap: () => Navigator.push(
                 context, MaterialPageRoute(builder: (_) => const BlockedScreen())),
-          ),
-          ListTile(
-            leading: const Icon(Icons.notifications_active_outlined),
-            title: const Text('اختبار الإشعارات'),
-            subtitle: const Text('يرسل إشعاراً تجريبياً لهذا الجهاز'),
-            onTap: () async {
-              final msg = await Push.test();
-              if (!context.mounted) return;
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('نتيجة الاختبار'),
-                  content: SingleChildScrollView(
-                      child: SelectableText(msg, textDirection: TextDirection.ltr)),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('حسناً'))
-                  ],
-                ),
-              );
-            },
           ),
           ListTile(
             leading: const Icon(Icons.info_outline),
