@@ -26,7 +26,16 @@ ThemeData _theme(Brightness b) {
   return ThemeData(
     useMaterial3: true,
     textTheme: GoogleFonts.cairoTextTheme(ThemeData(brightness: b).textTheme),
-    colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary, brightness: b),
+    colorScheme: ColorScheme.fromSeed(seedColor: AppColors.accent, brightness: b)
+        .copyWith(primary: AppColors.accent, onPrimary: Colors.white),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+          backgroundColor: AppColors.accent, foregroundColor: Colors.white),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.accent, foregroundColor: Colors.white),
+    ),
     appBarTheme: AppBarTheme(
       backgroundColor: light ? AppColors.primary : AppColors.darkBar,
       foregroundColor: Colors.white,
