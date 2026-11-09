@@ -127,7 +127,57 @@ perms = ('    <uses-permission android:name="android.permission.INTERNET"/>\n'
          '    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>\n')
 if "android.permission.INTERNET" not in s.split("<application")[0]:
     s = s.replace("<application", perms + "    <application", 1)
+meta = ('        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat"/>\n'
+        '        <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/hai_green"/>\n'
+        '        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="messages"/>\n')
+if "default_notification_icon" not in s:
+    s = re.sub(r'(<application[^>]*>)', lambda m: m.group(1) + "\n" + meta, s, count=1)
 mf.write_text(s)
+
+# --- أيقونة الإشعار (أحادية اللون) + لونها ---
+res = android / "app" / "src" / "main" / "res"
+(res / "drawable").mkdir(parents=True, exist_ok=True)
+(res / "values").mkdir(parents=True, exist_ok=True)
+(res / "drawable" / "ic_stat.xml").write_text(
+    '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" '
+    'android:viewportWidth="24" android:viewportHeight="24"><path android:fillColor="#FFFFFFFF" '
+    'android:pathData="M20,2H4C2.9,2 2,2.9 2,4v18l4,-4h14c1.1,0 2,-0.9 2,-2V4C22,2.9 21.1,2 20,2z"/></vector>')
+(res / "values" / "hai_colors.xml").write_text(
+    '<resources><color name="hai_green">#00A884</color></resources>')
+
+# --- MainActivity: قنوات الإشعارات (رسائل بصوت، مكالمات برنين) ---
+for f in main_root.rglob("MainActivity.kt"):
+    f.write_text('''package app.haiapp.com
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.media.AudioAttributes
+import android.media.RingtoneManager
+import android.os.Build
+import android.os.Bundle
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= 26) {
+            val nm = getSystemService(NotificationManager::class.java)
+            val msg = NotificationChannel("messages", "الرسائل", NotificationManager.IMPORTANCE_HIGH)
+            msg.enableVibration(true)
+            msg.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
+            nm.createNotificationChannel(msg)
+            val call = NotificationChannel("calls", "المكالمات", NotificationManager.IMPORTANCE_HIGH)
+            call.enableVibration(true)
+            call.vibrationPattern = longArrayOf(0, 800, 600, 800, 600, 800)
+            call.lockscreenVisibility = 1
+            call.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE),
+                AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE).build())
+            nm.createNotificationChannel(call)
+        }
+    }
+}
+''')
 
 # --- رفع compileSdk للإضافات القديمة (مثل agora_rtc_engine المبنية على android-31) ---
 KTS_FIX = """
