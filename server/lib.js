@@ -184,7 +184,7 @@ async function notify(env, authHeader, body) {
     } else {
       const chat = await fsGet(sa, gtoken, 'chats/' + encodeURIComponent(clip(body.chatId, 128)));
       if (!chat || !(chat.participants || []).includes(sender)) return [403, { error: 'forbidden' }];
-      recipients = (chat.participants || []).filter((u) => u !== sender);
+      recipients = (chat.participants || []).filter((u) => u !== sender && !(chat.mutedBy || []).includes(u));
       if (chat.groupName) {
         text = title + ': ' + text;
         title = chat.groupName;
