@@ -140,12 +140,9 @@ mf.write_text(s)
 res = android / "app" / "src" / "main" / "res"
 (res / "drawable").mkdir(parents=True, exist_ok=True)
 (res / "values").mkdir(parents=True, exist_ok=True)
-(res / "drawable" / "ic_stat.xml").write_text(
-    '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" '
-    'android:viewportWidth="24" android:viewportHeight="24"><path android:fillColor="#FFFFFFFF" '
-    'android:pathData="M20,2H4C2.9,2 2,2.9 2,4v18l4,-4h14c1.1,0 2,-0.9 2,-2V4C22,2.9 21.1,2 20,2z"/></vector>')
+shutil.copy("tools/ic_stat.png", res / "drawable" / "ic_stat.png")
 (res / "values" / "hai_colors.xml").write_text(
-    '<resources><color name="hai_green">#00A884</color></resources>')
+    '<resources><color name="hai_green">#A61E4E</color></resources>')
 
 # --- MainActivity: قنوات الإشعارات (رسائل بصوت، مكالمات برنين) ---
 for f in main_root.rglob("MainActivity.kt"):
