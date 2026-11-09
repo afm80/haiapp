@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:photo_manager/photo_manager.dart';
 import 'package:record/record.dart';
 
 import 'actions.dart';
@@ -136,7 +137,14 @@ class _ChatScreenState extends State<ChatScreen> {
       final x = await ImagePicker()
           .pickImage(source: source, maxWidth: 1024, imageQuality: 60);
       if (x == null) return;
-      final bytes = await x.readAsBytes();
+      await _sendImageBytes(await x.readAsBytes());
+    } catch (_) {
+      _snack('تعذر إرسال الصورة');
+    }
+  }
+
+  Future<void> _sendImageBytes(Uint8List bytes) async {
+    try {
       if (bytes.length > _maxMediaBytes) {
         _snack('الصورة كبيرة، اختر صورة أصغر');
         return;
@@ -161,6 +169,79 @@ class _ChatScreenState extends State<ChatScreen> {
     } finally {
       if (mounted) setState(() => _sendingMedia = false);
     }
+  }
+
+  /// مثل واتساب: الكاميرا + صور المعرض في شبكة واحدة
+  Future<void> _cameraSheet() async {
+    List<AssetEntity> assets = [];
+    try {
+      final perm = await PhotoManager.requestPermissionExtend();
+      if (perm.hasAccess) {
+        final paths = await PhotoManager.getAssetPathList(onlyAll: true, type: RequestType.image);
+        if (paths.isNotEmpty) assets = await paths.first.getAssetListPaged(page: 0, size: 90);
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    if (assets.isEmpty) {
+      _pickImage(ImageSource.camera);
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.black,
+      builder: (ctx) => SizedBox(
+        height: MediaQuery.of(ctx).size.height * 0.7,
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.white38, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 8),
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.all(2),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3, mainAxisSpacing: 2, crossAxisSpacing: 2),
+                itemCount: assets.length + 1,
+                itemBuilder: (_, i) {
+                  if (i == 0) {
+                    return InkWell(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _pickImage(ImageSource.camera);
+                      },
+                      child: Container(
+                        color: const Color(0xFF1F2C34),
+                        child: const Icon(Icons.photo_camera, color: Colors.white, size: 40),
+                      ),
+                    );
+                  }
+                  final a = assets[i - 1];
+                  return InkWell(
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final b = await a.thumbnailDataWithSize(
+                          const ThumbnailSize(1024, 1024), quality: 60);
+                      if (b != null) await _sendImageBytes(b);
+                    },
+                    child: FutureBuilder<Uint8List?>(
+                      future: a.thumbnailDataWithSize(const ThumbnailSize(250, 250)),
+                      builder: (_, snap) => snap.data == null
+                          ? Container(color: Colors.white10)
+                          : Image.memory(snap.data!, fit: BoxFit.cover),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _attachSheet() {
@@ -700,6 +781,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final type = (data['type'] ?? 'text') as String;
     final isImage = type == 'image';
     final isAudio = type == 'audio';
+    final isSticker = type == 'sticker';
     final readBy = List<String>.from(data['readBy'] ?? const []);
     final readAll = _others.isNotEmpty && _others.every(readBy.contains);
     final time = ts == null ? '' : hhmm(ts.toDate());
@@ -767,6 +849,15 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       );
+    } else if (isSticker) {
+      body = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(data['text'] ?? '', style: const TextStyle(fontSize: 72, height: 1.15)),
+          meta(),
+        ],
+      );
     } else if (isAudio) {
       body = Column(
         mainAxisSize: MainAxisSize.min,
@@ -810,11 +901,13 @@ class _ChatScreenState extends State<ChatScreen> {
         constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.8, minWidth: isAudio ? 240 : 0),
         decoration: BoxDecoration(
-          color: mine
-              ? (dark ? AppColors.mineDark : AppColors.mineLight)
-              : (dark ? AppColors.otherDark : AppColors.otherLight),
+          color: isSticker
+              ? Colors.transparent
+              : mine
+                  ? (dark ? AppColors.mineDark : AppColors.mineLight)
+                  : (dark ? AppColors.otherDark : AppColors.otherLight),
           borderRadius: shape,
-          boxShadow: dark
+          boxShadow: (dark || isSticker)
               ? null
               : const [BoxShadow(color: Colors.black12, blurRadius: 0.5, offset: Offset(0, 1))],
         ),
@@ -1069,31 +1162,56 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _emojiSheet() {
-    const list = [
+    const emojis = [
       '😀','😁','😂','🤣','😊','😍','😘','😎','🤔','😢','😭','😡','👍','👎','👏','🙏',
       '💪','🔥','❤️','💔','🎉','🌹','🌸','⭐','✅','❌','😴','🤝','👋','🙌','😇','🥰',
+      '😉','😋','😜','🤗','😏','😒','😔','😱','🤯','😷','🤒','🥳','😤','🙄','😬','🤩',
     ];
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: GridView.count(
-          crossAxisCount: 8,
-          shrinkWrap: true,
+    const stickers = [
+      '😂','🤣','😍','🥰','😘','😭','😡','😱','🤯','🥳','😎','🤩','😴','🤔','🙄','😇',
+      '👍','👏','🙏','💪','🔥','❤️','💔','🎉','🌹','🌸','🌻','🎂','🎁','☕','🍕','🚀',
+    ];
+    Widget grid(List<String> list, double size, int cols, void Function(String) onTap) =>
+        GridView.count(
+          crossAxisCount: cols,
           padding: const EdgeInsets.all(12),
           children: [
             for (final e in list)
               InkWell(
-                onTap: () {
-                  final t = _ctrl.text;
-                  final sel = _ctrl.selection;
-                  final at = sel.isValid ? sel.start : t.length;
-                  _ctrl.text = t.substring(0, at) + e + t.substring(at);
-                  _ctrl.selection = TextSelection.collapsed(offset: at + e.length);
-                  _onChanged(_ctrl.text);
-                },
-                child: Center(child: Text(e, style: const TextStyle(fontSize: 26))),
+                onTap: () => onTap(e),
+                child: Center(child: Text(e, style: TextStyle(fontSize: size))),
               ),
           ],
+        );
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SizedBox(
+        height: MediaQuery.of(ctx).size.height * 0.45,
+        child: DefaultTabController(
+          length: 2,
+          child: Column(
+            children: [
+              const TabBar(tabs: [Tab(text: 'إيموجي'), Tab(text: 'ملصقات')]),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    grid(emojis, 28, 8, (e) {
+                      final t = _ctrl.text;
+                      final sel = _ctrl.selection;
+                      final at = (sel.isValid && sel.start >= 0) ? sel.start : t.length;
+                      _ctrl.text = t.substring(0, at) + e + t.substring(at);
+                      _ctrl.selection = TextSelection.collapsed(offset: at + e.length);
+                      _onChanged(_ctrl.text);
+                    }),
+                    grid(stickers, 48, 4, (e) {
+                      Navigator.pop(ctx);
+                      _addMessage({'type': 'sticker', 'text': e}, '$e ملصق');
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1154,7 +1272,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     IconButton(
                       icon: const Icon(Icons.photo_camera_outlined),
                       onPressed:
-                          _editingId != null ? null : () => _pickImage(ImageSource.camera),
+                          _editingId != null ? null : _cameraSheet,
                     ),
                   ],
                 ),
