@@ -791,10 +791,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     const r = Radius.circular(12);
-    // رسائلي دائماً على اليمين والواردة على اليسار (مثل واتساب)
+    // (مثل واتساب العربي) رسائلي على اليسار والواردة على اليمين
     final shape = BorderRadius.only(
-      topRight: (tail && mine) ? Radius.zero : r,
-      topLeft: (tail && !mine) ? Radius.zero : r,
+      topLeft: (tail && mine) ? Radius.zero : r,
+      topRight: (tail && !mine) ? Radius.zero : r,
       bottomLeft: r,
       bottomRight: r,
     );
@@ -871,10 +871,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: mine ? Alignment.centerLeft : Alignment.centerRight,
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: (mine == rtl) ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+        crossAxisAlignment: (mine == rtl) ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           bubble,
           if (reactions.isNotEmpty)
@@ -1068,6 +1068,37 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  void _emojiSheet() {
+    const list = [
+      '😀','😁','😂','🤣','😊','😍','😘','😎','🤔','😢','😭','😡','👍','👎','👏','🙏',
+      '💪','🔥','❤️','💔','🎉','🌹','🌸','⭐','✅','❌','😴','🤝','👋','🙌','😇','🥰',
+    ];
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: GridView.count(
+          crossAxisCount: 8,
+          shrinkWrap: true,
+          padding: const EdgeInsets.all(12),
+          children: [
+            for (final e in list)
+              InkWell(
+                onTap: () {
+                  final t = _ctrl.text;
+                  final sel = _ctrl.selection;
+                  final at = sel.isValid ? sel.start : t.length;
+                  _ctrl.text = t.substring(0, at) + e + t.substring(at);
+                  _ctrl.selection = TextSelection.collapsed(offset: at + e.length);
+                  _onChanged(_ctrl.text);
+                },
+                child: Center(child: Text(e, style: const TextStyle(fontSize: 26))),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _composer(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final showSend = _hasText || _editingId != null;
@@ -1084,7 +1115,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   borderRadius: BorderRadius.circular(26),
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    IconButton(
+                      icon: const Icon(Icons.emoji_emotions_outlined),
+                      onPressed: _emojiSheet,
+                    ),
                     Expanded(
                       child: TextField(
                         controller: _ctrl,
@@ -1096,7 +1132,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           hintText: 'رسالة',
                           border: InputBorder.none,
                           contentPadding:
-                              EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              EdgeInsets.symmetric(horizontal: 4, vertical: 12),
                         ),
                       ),
                     ),
@@ -1110,7 +1146,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       )
                     else
                       IconButton(
-                        icon: const Icon(Icons.attach_file),
+                        icon: Transform.rotate(
+                            angle: -0.8, child: const Icon(Icons.attach_file)),
                         onPressed: _editingId != null ? null : _attachSheet,
                       ),
                     if (!showSend)
