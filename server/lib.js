@@ -211,7 +211,7 @@ async function notify(env, authHeader, body) {
               notification: {
                 channel_id: isCall ? 'calls' : 'messages',
                 icon: 'ic_stat',
-                color: '#00A884',
+                color: '#A61E4E',
                 sound: 'default',
               },
             },
