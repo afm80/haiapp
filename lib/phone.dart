@@ -154,6 +154,31 @@ Future<void> claimPhoneAndSaveProfile(PhoneValue p, Map<String, dynamic> profile
   }
 }
 
+/// تغيير رقم الموبايل: يحجز الرقم الجديد ويحرّر القديم، وتبقى المحادثات كما هي.
+/// الرقم الجديد غير موثّق حتى يُوثَّق من جديد.
+Future<void> changePhone(PhoneValue p) async {
+  final uid = currentUser.uid;
+  final newRef = fs.collection('phones').doc(p.key);
+  final userRef = fs.collection('users').doc(uid);
+  await fs.runTransaction((tx) async {
+    final u = await tx.get(userRef);
+    final oldKey = (u.data()?['phoneKey'] ?? '').toString();
+    if (oldKey == p.key) return;
+    final snap = await tx.get(newRef);
+    if (snap.exists && snap.data()?['uid'] != uid) throw PhoneTakenException();
+    if (!snap.exists) {
+      tx.set(newRef, {'uid': uid, 'createdAt': FieldValue.serverTimestamp()});
+    }
+    if (oldKey.isNotEmpty) tx.delete(fs.collection('phones').doc(oldKey));
+    tx.update(userRef, {
+      'phone': p.e164,
+      'phoneKey': p.key,
+      'phoneCountry': p.country.code,
+      'phoneVerified': false,
+    });
+  });
+}
+
 /// يحوّل رقماً دولياً (+9647...) إلى PhoneValue (أطول رمز دولة مطابق)
 PhoneValue? parseE164(String phone) {
   final d = phone.replaceAll(RegExp(r'\D'), '');

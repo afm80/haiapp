@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'blocked_screen.dart';
+import 'change_phone_screen.dart';
 import 'profile_setup_screen.dart';
 import 'push.dart';
 import 'username_screen.dart';
@@ -84,6 +85,8 @@ class SettingsScreen extends StatelessWidget {
               return ListTile(
                 leading: const Icon(Icons.phone_outlined),
                 title: const Text('رقم الموبايل'),
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const ChangePhoneScreen())),
                 subtitle: Directionality(
                     textDirection: TextDirection.ltr,
                     child: Text((u['phone'] ?? '').toString(), textAlign: TextAlign.start)),
