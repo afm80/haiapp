@@ -43,9 +43,12 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
 
       - name: بناء APK
-        run: flutter build apk --release
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: تسمية الملف باسم التطبيق
+        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/HaiApp.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: HaiApp-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/HaiApp.apk
