@@ -120,7 +120,7 @@ service cloud.firestore {
         );
         // أي عضو يقدر يضيف نفسه لقائمة "قرأ" فقط
         allow update: if signedIn() && isMember()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'deletedFor', 'reactions']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'deletedFor', 'reactions', 'starredBy']);
       }
     }
 
