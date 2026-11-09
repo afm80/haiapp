@@ -47,10 +47,11 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
         && request.resource.data.uid == request.auth.uid
         && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.phoneKey == key;
-      // لا يُحرَّر الرقم إلا عند حذف الحساب نفسه
+      // يُحرَّر الرقم عند حذف الحساب أو عند تغيير رقمي إلى رقم آخر
       allow delete: if signedIn()
         && resource.data.uid == request.auth.uid
-        && !existsAfter(/databases/$(database)/documents/users/$(request.auth.uid));
+        && (!existsAfter(/databases/$(database)/documents/users/$(request.auth.uid))
+            || getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.phoneKey != key);
     }
 
     match /users/{uid} {
@@ -66,9 +67,8 @@ service cloud.firestore {
           // تعديل عادي لا يمس الرقم
           !request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(['phone', 'phoneKey', 'phoneCountry', 'phoneVerified'])
-          // أو أول حجز للرقم (يُمنع تغييره بعدها)
-          || (!('phone' in resource.data)
-              && request.resource.data.get('phoneVerified', false) == false
+          // أو حجز رقم (أول مرة أو تغيير الرقم) ويصبح غير موثّق
+          || (request.resource.data.get('phoneVerified', false) == false
               && phoneClaimedAfter(request.resource.data))
         );
       allow delete: if signedIn() && request.auth.uid == uid;
