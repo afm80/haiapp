@@ -205,7 +205,16 @@ async function notify(env, authHeader, body) {
             token: tok,
             notification: { title: title || 'HaiApp', body: text },
             data,
-            android: { priority: 'HIGH', ttl: isCall ? '45s' : '86400s' },
+            android: {
+              priority: 'HIGH',
+              ttl: isCall ? '45s' : '86400s',
+              notification: {
+                channel_id: isCall ? 'calls' : 'messages',
+                icon: 'ic_stat',
+                color: '#00A884',
+                sound: 'default',
+              },
+            },
           },
         };
         const r = await tf(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
