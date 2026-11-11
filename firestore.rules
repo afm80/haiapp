@@ -106,6 +106,9 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.auth.uid in request.resource.data.participants
         && (request.resource.data.get('isGroup', false) == true
+            // الرسائل المحفوظة: محادثة عضوها صاحبها فقط
+            || (request.resource.data.participants.size() == 1
+                && chatId == 'saved_' + request.auth.uid)
             || (request.resource.data.participants.size() == 2
                 && chatId == request.resource.data.participants[0] + '_' + request.resource.data.participants[1]));
 
