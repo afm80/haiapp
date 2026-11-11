@@ -21,7 +21,7 @@ class WelcomeScreen extends StatelessWidget {
                 child: Image.asset('assets/icon/icon.png', width: 180, height: 180),
               ),
               const SizedBox(height: 32),
-              Text('مرحباً بك في HaiApp',
+              Text('مرحباً بك في HaiChat',
                   style: t.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               Text('تواصل مع أصدقائك وعائلتك بسهولة وخصوصية،\nرسائل وصور ومجموعات وحالات ومكالمات.',

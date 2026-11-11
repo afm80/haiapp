@@ -10,7 +10,7 @@ import 'package:share_plus/share_plus.dart';
 Future<bool> saveImageToGallery(BuildContext context, Uint8List bytes) async {
   final m = ScaffoldMessenger.of(context);
   try {
-    await Gal.putImageBytes(bytes, album: 'HaiApp');
+    await Gal.putImageBytes(bytes, album: 'HaiChat');
     m.showSnackBar(const SnackBar(content: Text('تم حفظ الصورة في المعرض')));
     return true;
   } catch (_) {
@@ -24,7 +24,7 @@ Future<void> shareImage(BuildContext context, Uint8List bytes) async {
   final m = ScaffoldMessenger.of(context);
   try {
     final dir = await getTemporaryDirectory();
-    final f = File('${dir.path}/HaiApp_${DateTime.now().millisecondsSinceEpoch}.jpg');
+    final f = File('${dir.path}/HaiChat_${DateTime.now().millisecondsSinceEpoch}.jpg');
     await f.writeAsBytes(bytes);
     await Share.shareXFiles([XFile(f.path)]);
   } catch (_) {

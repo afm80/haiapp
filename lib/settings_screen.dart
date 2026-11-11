@@ -142,7 +142,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: const Text('عن HaiApp'),
+            title: const Text('عن HaiChat'),
             subtitle: const Text('الإصدار 1.0.0'),
           ),
           const Divider(),

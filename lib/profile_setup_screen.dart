@@ -23,7 +23,7 @@ class ProfileSetupScreen extends StatefulWidget {
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _name = TextEditingController();
-  final _about = TextEditingController(text: 'مرحباً! أنا أستخدم HaiApp');
+  final _about = TextEditingController(text: 'مرحباً! أنا أستخدم HaiChat');
   String? _photo;
   PhoneValue? _phone; // الرقم المُدخل (تسجيل جديد)
   String? _savedPhone; // الرقم المحفوظ سابقاً (للعرض فقط ولا يمكن تغييره)

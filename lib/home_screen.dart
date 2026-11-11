@@ -236,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen>
                     border: InputBorder.none),
                 onChanged: (v) => _query.value = v.trim(),
               )
-            : Text(_tabs.index == 3 ? 'أنت' : 'HaiApp',
+            : Text(_tabs.index == 3 ? 'أنت' : 'HaiChat',
                 style: const TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           if (_searching)

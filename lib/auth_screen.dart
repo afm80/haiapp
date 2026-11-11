@@ -96,7 +96,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 child: Image.asset('assets/icon/icon.png', width: 160, height: 160),
               ),
               const SizedBox(height: 28),
-              Text('مرحباً بك في HaiApp',
+              Text('مرحباً بك في HaiChat',
                   style: t.headlineMedium
                       ?.copyWith(fontWeight: FontWeight.bold, color: onDark)),
               const SizedBox(height: 10),

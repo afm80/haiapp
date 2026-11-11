@@ -70,8 +70,8 @@ class _AddContactScreenState extends State<AddContactScreen> {
     final invite = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('غير مسجل في HaiApp'),
-        content: Text('${_name.text.trim()} ليس لديه HaiApp بعد. هل تريد دعوته؟'),
+        title: const Text('غير مسجل في HaiChat'),
+        content: Text('${_name.text.trim()} ليس لديه HaiChat بعد. هل تريد دعوته؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('لاحقاً')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('دعوة')),
@@ -80,7 +80,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
     );
     if (invite == true) {
       final uri = Uri(scheme: 'sms', path: phone.e164, queryParameters: {
-        'body': 'انضم إليّ على HaiApp للمحادثة والمكالمات المجانية!'
+        'body': 'انضم إليّ على HaiChat للمحادثة والمكالمات المجانية!'
       });
       try {
         await launchUrl(uri, mode: LaunchMode.externalApplication);

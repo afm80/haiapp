@@ -40,7 +40,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   Future<void> _invite() async {
     final uri = Uri(scheme: 'sms', queryParameters: {
-      'body': 'انضم إليّ على HaiApp للمحادثة والمكالمات المجانية!'
+      'body': 'انضم إليّ على HaiChat للمحادثة والمكالمات المجانية!'
     });
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -114,13 +114,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   Navigator.pushReplacement(context,
                       MaterialPageRoute(builder: (_) => const FindUserScreen()));
                 }),
-              if (users.isNotEmpty) _header('جهات الاتصال على HaiApp'),
+              if (users.isNotEmpty) _header('جهات الاتصال على HaiChat'),
               if (users.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(32),
                   child: Center(
                     child: Text(
-                      'ما لقينا أحد من جهات اتصالك مسجلاً في HaiApp بعد.\n'
+                      'ما لقينا أحد من جهات اتصالك مسجلاً في HaiChat بعد.\n'
                       'ادعُ أصدقاءك للتسجيل بأرقامهم.',
                       textAlign: TextAlign.center,
                     ),
@@ -155,7 +155,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 ),
               if (_q.isEmpty) ...[
                 const Divider(height: 24),
-                _action(Icons.share, 'دعوة أصدقاء إلى HaiApp', _invite),
+                _action(Icons.share, 'دعوة أصدقاء إلى HaiChat', _invite),
               ],
             ],
           );
