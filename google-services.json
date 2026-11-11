@@ -41,6 +41,35 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:82691756431:android:1e84220acac20c70ed7bfa",
+        "android_client_info": {
+          "package_name": "app.haichat.com"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "82691756431-u41dqee9m12c93qs494cs7e8itmvi20i.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCzAkcOxu54UGL1EgoY2gzZabxX6QpViVM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "82691756431-u41dqee9m12c93qs494cs7e8itmvi20i.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"
