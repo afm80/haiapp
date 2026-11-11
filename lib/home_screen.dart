@@ -7,6 +7,7 @@ import 'actions.dart';
 import 'app_colors.dart';
 import 'calls_tab.dart';
 import 'chat_actions.dart';
+import 'chat_folders.dart';
 import 'chats_tab.dart';
 import 'contacts_screen.dart';
 import 'chat_wallpaper.dart';
@@ -142,6 +143,15 @@ class _HomeScreenState extends State<HomeScreen>
             final ids = {..._selection.value};
             _clearSelection();
             toggleChatFlag(ids, 'pinnedBy');
+          },
+        ),
+        IconButton(
+          tooltip: 'إضافة إلى مجلد',
+          icon: const Icon(Icons.folder_outlined),
+          onPressed: () {
+            final ids = {..._selection.value};
+            _clearSelection();
+            addChatsToFolder(context, ids);
           },
         ),
         IconButton(
