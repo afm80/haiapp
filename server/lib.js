@@ -170,7 +170,7 @@ async function notify(env, authHeader, body) {
 
     if (body.kind === 'test') {
       recipients = [sender];
-      title = 'HaiApp';
+      title = 'HaiChat';
       text = 'اختبار الإشعارات ✅';
       data = { kind: 'test' };
     } else if (body.kind === 'call') {
@@ -178,7 +178,7 @@ async function notify(env, authHeader, body) {
       if (!call || call.callerId !== sender) return [403, { error: 'forbidden' }];
       recipients = call.calleeIds || [];
       text = body.video ? 'مكالمة فيديو واردة' : 'مكالمة صوتية واردة';
-      title = clip(body.title, 60) || 'HaiApp';
+      title = clip(body.title, 60) || 'HaiChat';
       data = { kind: 'call' };
       isCall = true;
     } else {
@@ -203,7 +203,7 @@ async function notify(env, authHeader, body) {
         const msg = {
           message: {
             token: tok,
-            notification: { title: title || 'HaiApp', body: text },
+            notification: { title: title || 'HaiChat', body: text },
             data,
             android: {
               priority: 'HIGH',
