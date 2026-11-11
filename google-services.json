@@ -51,6 +51,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "82691756431-73l8livh7qsta0nbadrpqmnkfl110lmr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.haichat.com",
+            "certificate_hash": "2dd8fd4295d401a4d1beea0582649774e7df82ef"
+          }
+        },
+        {
           "client_id": "82691756431-u41dqee9m12c93qs494cs7e8itmvi20i.apps.googleusercontent.com",
           "client_type": 3
         }
