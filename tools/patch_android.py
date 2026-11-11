@@ -115,7 +115,7 @@ for name, kts in (("build.gradle.kts", True), ("build.gradle", False)):
 # --- AndroidManifest: الاسم + الصلاحيات ---
 mf = android / "app" / "src" / "main" / "AndroidManifest.xml"
 s = mf.read_text()
-s = re.sub(r'android:label="[^"]*"', 'android:label="HaiApp"', s, count=1)
+s = re.sub(r'android:label="[^"]*"', 'android:label="HaiChat"', s, count=1)
 perms = ('    <uses-permission android:name="android.permission.INTERNET"/>\n'
          '    <uses-permission android:name="android.permission.CAMERA"/>\n'
          '    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n'
