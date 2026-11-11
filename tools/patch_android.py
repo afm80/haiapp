@@ -2,7 +2,7 @@
 import json, re, shutil, sys
 from pathlib import Path
 
-EXPECTED_PACKAGE = "app.haiapp.com"
+EXPECTED_PACKAGE = "app.haichat.com"
 android = Path("android")
 
 # --- فحص google-services.json ---
@@ -147,7 +147,7 @@ shutil.copy("tools/ic_stat.png", res / "drawable" / "ic_stat.png")
 
 # --- MainActivity: قنوات الإشعارات (رسائل بصوت، مكالمات برنين) ---
 for f in main_root.rglob("MainActivity.kt"):
-    f.write_text('''package app.haiapp.com
+    f.write_text('''package PKG_PLACEHOLDER
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -177,7 +177,7 @@ class MainActivity : FlutterActivity() {
         }
     }
 }
-''')
+'''.replace('PKG_PLACEHOLDER', EXPECTED_PACKAGE))
 
 # --- رفع compileSdk للإضافات القديمة (مثل agora_rtc_engine المبنية على android-31) ---
 KTS_FIX = """
