@@ -6,7 +6,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'actions.dart';
 import 'app_colors.dart';
+import 'image_preview_screen.dart';
 import 'contacts_service.dart';
 import 'utils.dart';
 import 'widgets.dart';
@@ -53,7 +55,14 @@ Future<void> postImageStatus(BuildContext context) async {
         .showSnackBar(const SnackBar(content: Text('الصورة كبيرة، اختر صورة أصغر')));
     return;
   }
-  await _addStatus({'type': 'image', 'image': base64Encode(bytes)});
+  final caption = await Navigator.push<String>(
+    context,
+    MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => ImagePreviewScreen(bytes: bytes, chatTitle: 'حالتي')),
+  );
+  if (caption == null) return; // أُلغي النشر
+  await _addStatus({'type': 'image', 'image': base64Encode(bytes), 'text': caption});
   if (context.mounted) {
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('تم نشر الحالة')));
@@ -69,10 +78,29 @@ Future<void> _addStatus(Map<String, dynamic> data) async {
   final now = DateTime.now();
   // تظهر الحالة لجهات اتصالك المسجلة في التطبيق فقط (مثل واتساب)، ولك أنت
   var visibleTo = <String>[currentUser.uid];
+  var mode = 'all';
+  var picked = <String>{};
+  try {
+    final me = await fs.collection('users').doc(currentUser.uid).get();
+    final p = me.data()?['statusPrivacy'];
+    if (p is Map) {
+      mode = (p['mode'] ?? 'all').toString();
+      picked = List<String>.from(p['list'] ?? const []).toSet();
+    }
+  } catch (_) {}
   try {
     final res = await ContactsService.load();
-    visibleTo = {currentUser.uid, ...res.matches.map((m) => m.uid)}.toList();
-  } catch (_) {}
+    final contacts = res.matches.map((m) => m.uid);
+    if (mode == 'only') {
+      visibleTo = {currentUser.uid, ...picked}.toList();
+    } else if (mode == 'except') {
+      visibleTo = {currentUser.uid, ...contacts.where((u) => !picked.contains(u))}.toList();
+    } else {
+      visibleTo = {currentUser.uid, ...contacts}.toList();
+    }
+  } catch (_) {
+    if (mode == 'only') visibleTo = {currentUser.uid, ...picked}.toList();
+  }
   await fs.collection('statuses').add({
     ...data,
     'uid': currentUser.uid,
@@ -217,8 +245,35 @@ class _StatusTabState extends State<StatusTab> {
     );
   }
 
+  Future<void> _muteMenu(String ownerUid, bool muted) async {
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: ListTile(
+          leading: Icon(muted ? Icons.volume_up_outlined : Icons.volume_off_outlined),
+          title: Text(muted ? 'إلغاء كتم الحالات' : 'كتم حالات هذا الشخص'),
+          onTap: () {
+            Navigator.pop(ctx);
+            fs.collection('users').doc(currentUser.uid).update({
+              'mutedStatus': muted
+                  ? FieldValue.arrayRemove([ownerUid])
+                  : FieldValue.arrayUnion([ownerUid])
+            }).catchError((_) {});
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    return UserBuilder(
+      uid: currentUser.uid,
+      builder: (context, meDoc) => _list(context, List<String>.from(meDoc['mutedStatus'] ?? const [])),
+    );
+  }
+
+  Widget _list(BuildContext context, List<String> mutedUids) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: _stream,
       builder: (context, snap) {
@@ -236,8 +291,10 @@ class _StatusTabState extends State<StatusTab> {
         }
         final uid = currentUser.uid;
         final mine = byUser[uid] ?? [];
-        final others = byUser.entries.where((e) => e.key != uid).toList()
+        final allOthers = byUser.entries.where((e) => e.key != uid).toList()
           ..sort((a, b) => _ms(b.value.last).compareTo(_ms(a.value.last)));
+        final others = allOthers.where((e) => !mutedUids.contains(e.key)).toList();
+        final mutedList = allOthers.where((e) => mutedUids.contains(e.key)).toList();
         final recent = others.where((e) => e.value.any((s) => !_viewedByMe(s))).toList();
         final seen = others.where((e) => e.value.every(_viewedByMe)).toList();
 
@@ -274,6 +331,7 @@ class _StatusTabState extends State<StatusTab> {
               subtitle: Text(list.isEmpty
                   ? 'اضغط لإضافة تحديث للحالة'
                   : '${dayLabel(DateTime.fromMillisecondsSinceEpoch(_ms(list.last)))} ${hhmm(DateTime.fromMillisecondsSinceEpoch(_ms(list.last)))}'),
+              onLongPress: isMe ? null : () => _muteMenu(ownerUid, mutedUids.contains(ownerUid)),
               onTap: () {
                 if (list.isEmpty) {
                   openTextStatusCreator(context);
@@ -300,7 +358,9 @@ class _StatusTabState extends State<StatusTab> {
             for (final e in recent) tile(e.key, e.value),
             if (seen.isNotEmpty) header('تمت المشاهدة'),
             for (final e in seen) tile(e.key, e.value),
-            if (others.isEmpty)
+            if (mutedList.isNotEmpty) header('الحالات المكتومة'),
+            for (final e in mutedList) Opacity(opacity: 0.55, child: tile(e.key, e.value)),
+            if (allOthers.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(32),
                 child: Center(child: Text('ما فيه تحديثات حالة من الآخرين الآن')),
@@ -328,6 +388,8 @@ class _StatusViewerScreenState extends State<StatusViewerScreen>
   late final AnimationController _anim =
       AnimationController(vsync: this, duration: const Duration(seconds: 5));
   late final List<StatusDoc> _items = [...widget.statuses];
+  final _replyCtrl = TextEditingController();
+  final _replyFocus = FocusNode();
   int _i = 0;
 
   bool get _isMine => widget.ownerUid == currentUser.uid;
@@ -337,6 +399,13 @@ class _StatusViewerScreenState extends State<StatusViewerScreen>
     super.initState();
     _anim.addStatusListener((s) {
       if (s == AnimationStatus.completed) _next();
+    });
+    _replyFocus.addListener(() {
+      if (_replyFocus.hasFocus) {
+        _anim.stop();
+      } else if (mounted) {
+        _anim.forward();
+      }
     });
     // ابدأ من أول حالة لم تُشاهد
     final firstUnseen = _items.indexWhere((s) => !_viewedByMe(s));
@@ -410,8 +479,40 @@ class _StatusViewerScreenState extends State<StatusViewerScreen>
     });
   }
 
+  /// الرد على الحالة برسالة تصل إلى محادثة صاحبها
+  Future<void> _reply() async {
+    final t = _replyCtrl.text.trim();
+    if (t.isEmpty) return;
+    _replyCtrl.clear();
+    _replyFocus.unfocus();
+    final me = currentUser.uid;
+    final other = widget.ownerUid;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final chatId = chatIdFor(me, other);
+      final u = await fs.collection('users').doc(other).get();
+      await fs.collection('chats').doc(chatId).set({
+        'participants': [me, other]..sort(),
+        'isGroup': false,
+        'names': {me: currentUser.displayName ?? '', other: (u.data()?['name'] ?? '').toString()},
+      }, SetOptions(merge: true));
+      final st = _items[_i].data();
+      final quoted = (st['text'] ?? '').toString();
+      await sendToChat(chatId, [me, other], {
+        'type': 'text',
+        'text': t,
+        'replyText': quoted.isEmpty ? 'رد على حالتك' : 'رد على حالتك: $quoted',
+      }, t);
+      messenger.showSnackBar(const SnackBar(content: Text('تم إرسال الرد')));
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('تعذر إرسال الرد')));
+    }
+  }
+
   @override
   void dispose() {
+    _replyCtrl.dispose();
+    _replyFocus.dispose();
     _anim.dispose();
     super.dispose();
   }
@@ -492,6 +593,41 @@ class _StatusViewerScreenState extends State<StatusViewerScreen>
                     ),
                   ),
                   const Spacer(),
+                  if (!isText && (s['text'] ?? '').toString().isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      color: Colors.black54,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      child: Text((s['text'] ?? '').toString(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white, fontSize: 16)),
+                    ),
+                  if (!_isMine)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                      child: TextField(
+                        controller: _replyCtrl,
+                        focusNode: _replyFocus,
+                        style: const TextStyle(color: Colors.white),
+                        cursorColor: Colors.white,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _reply(),
+                        decoration: InputDecoration(
+                          hintText: 'رد على الحالة...',
+                          hintStyle: const TextStyle(color: Colors.white70),
+                          filled: true,
+                          fillColor: Colors.black45,
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(26), borderSide: BorderSide.none),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.send, color: Colors.white),
+                            onPressed: _reply,
+                          ),
+                        ),
+                      ),
+                    ),
                   if (_isMine)
                     Padding(
                       padding: const EdgeInsets.all(8),

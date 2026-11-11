@@ -5,6 +5,7 @@ import 'appearance_screen.dart';
 import 'blocked_screen.dart';
 import 'change_phone_screen.dart';
 import 'profile_setup_screen.dart';
+import 'status_privacy_screen.dart';
 import 'username_screen.dart';
 import 'utils.dart';
 import 'verify_config.dart';
@@ -133,6 +134,13 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('خلفية المحادثة'),
             onTap: () => Navigator.push(
                 context, MaterialPageRoute(builder: (_) => const AppearanceScreen())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.lock_outline),
+            title: const Text('خصوصية الحالة'),
+            subtitle: const Text('من يرى حالتي'),
+            onTap: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const StatusPrivacyScreen())),
           ),
           ListTile(
             leading: const Icon(Icons.block),
