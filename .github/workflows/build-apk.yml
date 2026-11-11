@@ -1,4 +1,4 @@
-name: Build HaiApp APK
+name: Build HaiChat APK
 
 on:
   push:
@@ -46,9 +46,9 @@ jobs:
         run: flutter build apk --release --target-platform android-arm64
 
       - name: تسمية الملف باسم التطبيق
-        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/HaiApp.apk
+        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/HaiChat.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: HaiApp-apk
-          path: build/app/outputs/flutter-apk/HaiApp.apk
+          name: HaiChat-apk
+          path: build/app/outputs/flutter-apk/HaiChat.apk
