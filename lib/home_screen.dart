@@ -9,6 +9,7 @@ import 'calls_tab.dart';
 import 'chat_actions.dart';
 import 'chats_tab.dart';
 import 'contacts_screen.dart';
+import 'chat_wallpaper.dart';
 import 'contacts_service.dart';
 import 'call_state.dart';
 import 'push.dart';
@@ -49,6 +50,10 @@ class _HomeScreenState extends State<HomeScreen>
     });
     // يطلب إذن جهات الاتصال مرة واحدة ويحمّل أسماءها لعرضها في المحادثات
     unawaited(ContactsService.load().then((_) {}, onError: (_) {}));
+    unawaited(fs.collection('users').doc(currentUser.uid).get().then((d) {
+      final w = (d.data()?['wallpaper'] ?? '').toString();
+      if (kWallpapers.containsKey(w)) wallpaperPref.value = w;
+    }, onError: (_) {}));
     // خصوصية: نحذف الإيميل من ملفك الشخصي في Firestore إن كان محفوظاً من نسخ سابقة
     fs
         .collection('users')

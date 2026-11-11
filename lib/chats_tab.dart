@@ -68,6 +68,7 @@ class _ChatsTabState extends State<ChatsTab> {
       List<String>.from(d[key] ?? const []).contains(_uid);
 
   String _titleOf(Map<String, dynamic> d) {
+    if (d['isSaved'] == true) return 'الرسائل المحفوظة';
     if (d['isGroup'] == true) return (d['groupName'] ?? 'مجموعة').toString();
     final names = Map<String, dynamic>.from(d['names'] ?? {});
     final otherId =
@@ -79,11 +80,240 @@ class _ChatsTabState extends State<ChatsTab> {
       (d['lastMessageAt'] as Timestamp?)?.millisecondsSinceEpoch ??
       DateTime.now().millisecondsSinceEpoch;
 
+  // ---------- المجلدات (محفوظة في ملفك الشخصي ولا يراها غيرك) ----------
+  String _folder = 'all'; // all | unread | معرّف مجلد
+  List<Map<String, dynamic>> _folders = [];
+
+  List<Map<String, dynamic>> _readFolders(Map<String, dynamic> u) {
+    final raw = u['folders'];
+    if (raw is! List) return [];
+    return [
+      for (final f in raw)
+        if (f is Map)
+          {
+            'id': (f['id'] ?? '').toString(),
+            'name': (f['name'] ?? '').toString(),
+            'chats': List<String>.from(f['chats'] ?? const []),
+          }
+    ];
+  }
+
+  Future<void> _saveFolders(List<Map<String, dynamic>> list) async {
+    try {
+      await fs.collection('users').doc(_uid).update({'folders': list});
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('تعذر حفظ المجلد')));
+      }
+    }
+  }
+
+  Future<String?> _askName(String title, {String initial = ''}) {
+    final c = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          maxLength: 20,
+          decoration: const InputDecoration(hintText: 'مثال: عمل، عائلة'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, c.text.trim()), child: const Text('حفظ')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _newFolder() async {
+    final name = await _askName('مجلد جديد');
+    if (name == null || name.isEmpty) return;
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    await _saveFolders([
+      ..._folders,
+      {'id': id, 'name': name, 'chats': <String>[]}
+    ]);
+    if (mounted) setState(() => _folder = id);
+  }
+
+  void _folderMenu(Map<String, dynamic> f) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('تغيير اسم المجلد'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final name = await _askName('اسم المجلد', initial: f['name'] as String);
+                if (name == null || name.isEmpty) return;
+                await _saveFolders([
+                  for (final x in _folders) x['id'] == f['id'] ? {...x, 'name': name} : x
+                ]);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: Theme.of(ctx).colorScheme.error),
+              title: Text('حذف المجلد',
+                  style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+              subtitle: const Text('المحادثات نفسها لا تُحذف'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await _saveFolders([
+                  for (final x in _folders)
+                    if (x['id'] != f['id']) x
+                ]);
+                if (mounted && _folder == f['id']) setState(() => _folder = 'all');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// اختيار المجلدات التي تضم هذه المحادثة
+  Future<void> _chooseFolders(String chatId) async {
+    if (_folders.isEmpty) {
+      await _newFolder();
+      return;
+    }
+    final inFolder = {
+      for (final f in _folders) f['id'] as String: (f['chats'] as List<String>).contains(chatId)
+    };
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('إضافة إلى مجلد'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final f in _folders)
+                  CheckboxListTile(
+                    value: inFolder[f['id']] ?? false,
+                    title: Text(f['name'] as String),
+                    onChanged: (v) => setS(() => inFolder[f['id'] as String] = v ?? false),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حفظ')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    await _saveFolders([
+      for (final f in _folders)
+        {
+          ...f,
+          'chats': [
+            ...(f['chats'] as List<String>).where((c) => c != chatId),
+            if (inFolder[f['id']] ?? false) chatId,
+          ],
+        }
+    ]);
+  }
+
+  Widget _chips() {
+    Widget chip(String id, String label, {Map<String, dynamic>? folder}) => Padding(
+          padding: const EdgeInsetsDirectional.only(end: 8),
+          child: GestureDetector(
+            onLongPress: folder == null ? null : () => _folderMenu(folder),
+            child: ChoiceChip(
+              label: Text(label),
+              selected: _folder == id,
+              onSelected: (_) => setState(() => _folder = id),
+            ),
+          ),
+        );
+    return SizedBox(
+      height: 48,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        children: [
+          chip('all', 'الكل'),
+          chip('unread', 'غير المقروءة'),
+          for (final f in _folders) chip(f['id'] as String, f['name'] as String, folder: f),
+          ActionChip(
+            avatar: const Icon(Icons.add, size: 18),
+            label: const Text('مجلد'),
+            onPressed: _newFolder,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// الرسائل المحفوظة: محادثة مع نفسك
+  Widget _savedRow(Map<String, dynamic>? saved) {
+    final last = (saved?['lastMessage'] ?? '').toString();
+    return ListTile(
+      leading: const CircleAvatar(
+        radius: 28,
+        backgroundColor: AppColors.accent,
+        child: Icon(Icons.bookmark, color: Colors.white),
+      ),
+      title: const Text('الرسائل المحفوظة', style: TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(last.isEmpty ? 'احفظ ملاحظاتك وصورك هنا' : last,
+          maxLines: 1, overflow: TextOverflow.ellipsis),
+      onTap: () async {
+        final id = 'saved_$_uid';
+        try {
+          await fs.collection('chats').doc(id).set({
+            'participants': [_uid],
+            'isGroup': false,
+            'isSaved': true,
+            'names': {_uid: 'الرسائل المحفوظة'},
+          }, SetOptions(merge: true));
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(const SnackBar(content: Text('تعذر فتح الرسائل المحفوظة')));
+          }
+          return;
+        }
+        if (!mounted) return;
+        Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(chatId: id)));
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<String>(
       valueListenable: widget.query,
-      builder: (context, q, _) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      builder: (context, q, _) => UserBuilder(
+        uid: _uid,
+        builder: (context, me) {
+          _folders = _readFolders(me);
+          if (_folder != 'all' &&
+              _folder != 'unread' &&
+              !_folders.any((f) => f['id'] == _folder)) {
+            _folder = 'all';
+          }
+          return _body(context, q);
+        },
+      ),
+    );
+  }
+
+  Widget _body(BuildContext context, String q) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: _stream,
         builder: (context, snap) {
           if (snap.hasError) {
@@ -92,13 +322,31 @@ class _ChatsTabState extends State<ChatsTab> {
           if (!snap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
+          Map<String, dynamic>? saved;
+          for (final d in snap.data!.docs) {
+            if (d.data()['isSaved'] == true) saved = d.data();
+          }
           final all = snap.data!.docs
-              .where((d) => d.data()['lastMessage'] != null && !_hidden(d.data()))
+              .where((d) =>
+                  d.data()['isSaved'] != true &&
+                  d.data()['lastMessage'] != null &&
+                  !_hidden(d.data()))
               .toList();
           final archivedCount = all.where((d) => _flag(d.data(), 'archivedBy')).length;
+          final folderChats = _folders
+              .where((f) => f['id'] == _folder)
+              .expand((f) => f['chats'] as List<String>)
+              .toSet();
           final docs = all
               .where((d) => _flag(d.data(), 'archivedBy') == widget.archived)
               .where((d) => q.isEmpty || _titleOf(d.data()).contains(q))
+              .where((d) {
+                if (widget.archived || _folder == 'all') return true;
+                if (_folder == 'unread') {
+                  return ((d.data()['unread'] as Map?)?[_uid] ?? 0) > 0;
+                }
+                return folderChats.contains(d.id);
+              })
               .toList()
             ..sort((a, b) {
               final pa = _flag(a.data(), 'pinnedBy') ? 1 : 0;
@@ -107,14 +355,31 @@ class _ChatsTabState extends State<ChatsTab> {
               return _millis(b.data()).compareTo(_millis(a.data()));
             });
 
-          final showArchiveRow = !widget.archived && archivedCount > 0 && q.isEmpty;
-          if (docs.isEmpty && !showArchiveRow) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+          final showHeader = !widget.archived && q.isEmpty;
+          final showArchiveRow =
+              !widget.archived && archivedCount > 0 && q.isEmpty && _folder == 'all';
+          final headers = <Widget>[
+            if (showHeader) _chips(),
+            if (showHeader && _folder == 'all') _savedRow(saved),
+            if (showArchiveRow)
+              ListTile(
+                leading: const Icon(Icons.archive_outlined),
+                title: const Text('المؤرشفة'),
+                trailing: Text('$archivedCount'),
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const ArchivedScreen())),
+              ),
+          ];
+
+          Widget? empty;
+          if (docs.isEmpty) {
+            final firstTime = _folder == 'all' && !widget.archived && q.isEmpty;
+            empty = Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (firstTime || (!showHeader && q.isEmpty))
                     Opacity(
                       opacity: 0.9,
                       child: ClipRRect(
@@ -122,39 +387,36 @@ class _ChatsTabState extends State<ChatsTab> {
                         child: Image.asset('assets/icon/icon.png', width: 96, height: 96),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      q.isNotEmpty
-                          ? 'لا نتائج'
-                          : (widget.archived
-                              ? 'لا توجد محادثات مؤرشفة'
-                              : 'ما عندك محادثات بعد.\nاضغط على زر المحادثة لبدء أول محادثة.'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ],
-                ),
+                  const SizedBox(height: 20),
+                  Text(
+                    q.isNotEmpty
+                        ? 'لا نتائج'
+                        : (widget.archived
+                            ? 'لا توجد محادثات مؤرشفة'
+                            : (_folder == 'all'
+                                ? 'ما عندك محادثات بعد.\nاضغط على زر المحادثة لبدء أول محادثة.'
+                                : (_folder == 'unread'
+                                    ? 'لا رسائل غير مقروءة'
+                                    : 'المجلد فارغ.\nاضغط مطوّلاً على محادثة ثم "إضافة إلى مجلد".'))),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ],
               ),
             );
           }
+          final extra = empty == null ? 0 : 1;
           return ListView.builder(
-            itemCount: docs.length + (showArchiveRow ? 1 : 0),
+            itemCount: headers.length + docs.length + extra,
             itemBuilder: (context, i) {
-              if (showArchiveRow && i == 0) {
-                return ListTile(
-                  leading: const Icon(Icons.archive_outlined),
-                  title: const Text('المؤرشفة'),
-                  trailing: Text('$archivedCount'),
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const ArchivedScreen())),
-                );
-              }
-              return _tile(context, docs[i - (showArchiveRow ? 1 : 0)]);
+              if (i < headers.length) return headers[i];
+              final j = i - headers.length;
+              if (j < docs.length) return _tile(context, docs[j]);
+              return empty!;
             },
           );
         },
-      ),
-    );
+      );
   }
 
   void _menu(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
@@ -176,6 +438,14 @@ class _ChatsTabState extends State<ChatsTab> {
                       ? FieldValue.arrayRemove([_uid])
                       : FieldValue.arrayUnion([_uid])
                 });
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder_outlined),
+              title: const Text('إضافة إلى مجلد'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _chooseFolders(doc.id);
               },
             ),
             ListTile(

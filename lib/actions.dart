@@ -99,5 +99,7 @@ Future<void> sendToChat(String chatId, List<String> participants,
     if (p != uid) upd['unread.$p'] = FieldValue.increment(1);
   }
   await chat.update(upd);
-  Push.notify({'kind': 'message', 'chatId': chatId, 'title': name, 'body': preview});
+  if (participants.any((p) => p != uid)) {
+    Push.notify({'kind': 'message', 'chatId': chatId, 'title': name, 'body': preview});
+  }
 }

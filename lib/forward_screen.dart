@@ -11,6 +11,7 @@ class ForwardScreen extends StatelessWidget {
   const ForwardScreen({super.key, required this.message});
 
   String _title(Map<String, dynamic> d) {
+    if (d['isSaved'] == true) return 'الرسائل المحفوظة';
     if (d['isGroup'] == true) return (d['groupName'] ?? 'مجموعة').toString();
     final names = Map<String, dynamic>.from(d['names'] ?? {});
     final other = (d['participants'] as List)

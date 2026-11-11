@@ -2,7 +2,41 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-/// خلفية المحادثة: زهور وورود متنوعة مرسومة بالكود (بدون صور)
+/// خيارات الخلفية: المعرّف -> الاسم
+const kWallpapers = <String, String>{
+  'flowers': 'ورود',
+  'plain': 'سادة',
+  'rose': 'وردي هادئ',
+  'sea': 'أزرق هادئ',
+  'mint': 'أخضر هادئ',
+};
+
+/// الخلفية المختارة (تُحمَّل من حساب المستخدم)
+final ValueNotifier<String> wallpaperPref = ValueNotifier<String>('flowers');
+
+/// ألوان تدرّج الخلفية (أعلى، أسفل) حسب الخيار والوضع
+List<Color> wallpaperColors(String id, bool dark) {
+  switch (id) {
+    case 'rose':
+      return dark
+          ? const [Color(0xFF1C1218), Color(0xFF2A1722)]
+          : const [Color(0xFFFBF1F4), Color(0xFFF1DCE4)];
+    case 'sea':
+      return dark
+          ? const [Color(0xFF101820), Color(0xFF16283A)]
+          : const [Color(0xFFF0F6FA), Color(0xFFD9E7F1)];
+    case 'mint':
+      return dark
+          ? const [Color(0xFF101A17), Color(0xFF16291F)]
+          : const [Color(0xFFF0F8F4), Color(0xFFD9EBE1)];
+    default:
+      return dark
+          ? const [Color(0xFF14161C), Color(0xFF1F2430)]
+          : const [Color(0xFFF6F5F3), Color(0xFFE6E4E0)];
+  }
+}
+
+/// خلفية المحادثة: زهور وورود متنوعة مرسومة بالكود (بدون صور) أو تدرّج لوني
 class ChatWallpaper extends StatelessWidget {
   final bool dark;
   final Widget child;
@@ -10,20 +44,24 @@ class ChatWallpaper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(children: [
-      Positioned.fill(
-        child: RepaintBoundary(
-          child: CustomPaint(painter: _PatternPainter(dark)),
+    return ValueListenableBuilder<String>(
+      valueListenable: wallpaperPref,
+      builder: (_, id, __) => Stack(children: [
+        Positioned.fill(
+          child: RepaintBoundary(
+            child: CustomPaint(painter: _PatternPainter(dark, id)),
+          ),
         ),
-      ),
-      child,
-    ]);
+        child,
+      ]),
+    );
   }
 }
 
 class _PatternPainter extends CustomPainter {
   final bool dark;
-  _PatternPainter(this.dark);
+  final String style;
+  _PatternPainter(this.dark, this.style);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -34,10 +72,9 @@ class _PatternPainter extends CustomPainter {
           ..shader = LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: dark
-                ? const [Color(0xFF14161C), Color(0xFF1F2430)]
-                : const [Color(0xFFF6F5F3), Color(0xFFE6E4E0)],
+            colors: wallpaperColors(style, dark),
           ).createShader(rect));
+    if (style != 'flowers') return;
     final ink = dark ? const Color(0xFF2E3544) : const Color(0xFFD3D0CA);
     final p = Paint()
       ..color = ink
@@ -186,5 +223,6 @@ class _PatternPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _PatternPainter old) => old.dark != dark;
+  bool shouldRepaint(covariant _PatternPainter old) =>
+      old.dark != dark || old.style != style;
 }

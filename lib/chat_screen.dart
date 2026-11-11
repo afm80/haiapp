@@ -440,8 +440,11 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _openInfo() => Navigator.push(
-      context, MaterialPageRoute(builder: (_) => ChatInfoScreen(chatId: widget.chatId)));
+  void _openInfo() {
+    if (_chat['isSaved'] == true) return;
+    Navigator.push(
+        context, MaterialPageRoute(builder: (_) => ChatInfoScreen(chatId: widget.chatId)));
+  }
 
   // ---------- الواجهة ----------
   @override
@@ -546,6 +549,9 @@ class _ChatScreenState extends State<ChatScreen> {
       final names = Map<String, dynamic>.from(_chat['names'] ?? {});
       final members = _participants.map((p) => (names[p] ?? '').toString()).join('، ');
       title = header(callTitle, _chat['groupPhoto'] as String?, typing ?? members);
+    } else if (_chat['isSaved'] == true) {
+      callTitle = 'الرسائل المحفوظة';
+      title = header('الرسائل المحفوظة', null, 'ملاحظات لك وحدك');
     } else {
       final otherId = _others.isEmpty ? _uid : _others.first;
       final names = Map<String, dynamic>.from(_chat['names'] ?? {});
@@ -564,6 +570,7 @@ class _ChatScreenState extends State<ChatScreen> {
       titleSpacing: 0,
       title: title,
       actions: [
+        if (_chat['isSaved'] != true) ...[
         IconButton(
           icon: const Icon(Icons.videocam),
           onPressed: () =>
@@ -574,6 +581,7 @@ class _ChatScreenState extends State<ChatScreen> {
           onPressed: () =>
               startCall(context, calleeIds: _others, title: callTitle, video: false),
         ),
+        ],
         PopupMenuButton<String>(
           onSelected: (v) {
             if (v == 'search') {
