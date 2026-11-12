@@ -125,6 +125,7 @@ perms = ('    <uses-permission android:name="android.permission.INTERNET"/>\n'
          '    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>\n'
          '    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>\n'
          '    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>\n'
+         '    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>\n'
          '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n'
          '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n'
          '    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>\n')
@@ -145,6 +146,14 @@ shutil.copy("tools/ic_stat.png", res / "drawable" / "ic_stat.png")
 (res / "values" / "hai_colors.xml").write_text(
     '<resources><color name="hai_green">#A61E4E</color></resources>')
 
+# --- ثيم متوافق مع نافذة البصمة (يمنع انهيار أندرويد 8 وما دونه) ---
+for st in res.rglob("styles.xml"):
+    t = st.read_text()
+    t2 = re.sub(r'(<style name="(?:LaunchTheme|NormalTheme)" parent=")[^"]+(")',
+                r'\1Theme.AppCompat.DayNight.NoActionBar\2', t)
+    if t2 != t:
+        st.write_text(t2)
+
 # --- MainActivity: قنوات الإشعارات (رسائل بصوت، مكالمات برنين) ---
 for f in main_root.rglob("MainActivity.kt"):
     f.write_text('''package PKG_PLACEHOLDER
@@ -155,9 +164,9 @@ import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= 26) {
