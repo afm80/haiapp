@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import 'app_lock.dart';
 import 'appearance_screen.dart';
 import 'blocked_screen.dart';
 import 'change_phone_screen.dart';
@@ -129,6 +130,8 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('حساب Google'),
             subtitle: Text(user.email ?? ''),
           ),
+          const ThemeModeTile(),
+          const AppLockTile(),
           ListTile(
             leading: const Icon(Icons.wallpaper_outlined),
             title: const Text('خلفية المحادثة'),

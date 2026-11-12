@@ -281,7 +281,7 @@ class _CallScreenState extends State<CallScreen> {
   Widget _btn(IconData icon, VoidCallback onTap, {bool on = false, Color? bg}) => InkResponse(
         onTap: onTap,
         child: CircleAvatar(
-          radius: 28,
+          radius: 30,
           backgroundColor: bg ?? (on ? Colors.white : Colors.white24),
           child: Icon(icon, color: bg != null ? Colors.white : (on ? Colors.black87 : Colors.white)),
         ),
@@ -295,8 +295,16 @@ class _CallScreenState extends State<CallScreen> {
         if (!didPop) _hangUp();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF1B2A2A),
-        body: SafeArea(
+        backgroundColor: const Color(0xFF2E0115),
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF7A0A3C), Color(0xFF5F012B), Color(0xFF2E0115)],
+            ),
+          ),
+          child: SafeArea(
           child: Column(children: [
             Expanded(child: _body()),
             Padding(
@@ -320,6 +328,7 @@ class _CallScreenState extends State<CallScreen> {
               ]),
             ),
           ]),
+        ),
         ),
       ),
     );

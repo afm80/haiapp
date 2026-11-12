@@ -10,6 +10,8 @@ import 'chat_actions.dart';
 import 'chat_folders.dart';
 import 'chats_tab.dart';
 import 'contacts_screen.dart';
+import 'app_lock.dart';
+import 'app_prefs.dart';
 import 'chat_wallpaper.dart';
 import 'contacts_service.dart';
 import 'call_state.dart';
@@ -35,6 +37,9 @@ class _HomeScreenState extends State<HomeScreen>
   final _searchCtrl = TextEditingController();
   bool _searching = false;
   bool _foreground = true;
+  bool _locked = false;
+  bool _lockOn = false;
+  DateTime? _pausedAt;
   Timer? _heartbeat;
   StreamSubscription? _callSub;
 
@@ -54,6 +59,13 @@ class _HomeScreenState extends State<HomeScreen>
     unawaited(fs.collection('users').doc(currentUser.uid).get().then((d) {
       final w = (d.data()?['wallpaper'] ?? '').toString();
       if (kWallpapers.containsKey(w)) wallpaperPref.value = w;
+      themeModePref.value = themeModeFromString((d.data()?['themeMode'] ?? '').toString());
+      if (d.data()?['appLock'] == true && mounted) {
+        setState(() {
+          _lockOn = true;
+          _locked = true;
+        });
+      }
     }, onError: (_) {}));
     // خصوصية: نحذف الإيميل من ملفك الشخصي في Firestore إن كان محفوظاً من نسخ سابقة
     fs
@@ -73,6 +85,15 @@ class _HomeScreenState extends State<HomeScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
     setPresence(_foreground);
+    if (state == AppLifecycleState.paused) {
+      _pausedAt = DateTime.now();
+    } else if (state == AppLifecycleState.resumed) {
+      final p = _pausedAt;
+      _pausedAt = null;
+      if (_lockOn && p != null && DateTime.now().difference(p).inSeconds > 15) {
+        setState(() => _locked = true);
+      }
+    }
   }
 
   void _listenForCalls() {
@@ -220,6 +241,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_locked) {
+      return LockScreen(onUnlocked: () => setState(() => _locked = false));
+    }
     return PopScope(
       canPop: !_selecting,
       onPopInvokedWithResult: (didPop, result) {

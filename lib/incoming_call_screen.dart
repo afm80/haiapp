@@ -90,7 +90,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
         children: [
           InkResponse(
             onTap: onTap,
-            child: CircleAvatar(radius: 34, backgroundColor: color, child: Icon(icon, color: Colors.white, size: 30)),
+            child: CircleAvatar(radius: 36, backgroundColor: color, child: Icon(icon, color: Colors.white, size: 30)),
           ),
           const SizedBox(height: 8),
           Text(label, style: const TextStyle(color: Colors.white70)),
@@ -104,8 +104,16 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0F2422),
-        body: SafeArea(
+        backgroundColor: const Color(0xFF2E0115),
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF7A0A3C), Color(0xFF5F012B), Color(0xFF2E0115)],
+            ),
+          ),
+          child: SafeArea(
           child: Column(
             children: [
               const SizedBox(height: 56),
@@ -151,6 +159,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

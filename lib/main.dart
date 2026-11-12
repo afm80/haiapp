@@ -8,6 +8,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app_colors.dart';
+import 'app_prefs.dart';
 import 'auth_screen.dart';
 import 'google_config.dart';
 import 'home_screen.dart';
@@ -68,8 +69,11 @@ class HaiApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeModePref,
+      builder: (context, mode, _) => MaterialApp(
       title: 'HaiChat',
+      themeMode: mode,
       debugShowCheckedModeBanner: false,
       locale: const Locale('ar'),
       supportedLocales: const [Locale('ar'), Locale('en')],
@@ -81,6 +85,7 @@ class HaiApp extends StatelessWidget {
       theme: _theme(Brightness.light),
       darkTheme: _theme(Brightness.dark),
       home: const AuthGate(),
+    ),
     );
   }
 }
