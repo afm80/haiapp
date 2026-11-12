@@ -8,6 +8,7 @@ import 'change_phone_screen.dart';
 import 'profile_setup_screen.dart';
 import 'status_privacy_screen.dart';
 import 'username_screen.dart';
+import 'account_setup_screen.dart';
 import 'utils.dart';
 import 'verify_config.dart';
 import 'verify_phone_screen.dart';
@@ -124,6 +125,14 @@ class SettingsScreen extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const UsernameScreen())),
               );
             },
+          ),
+          ListTile(
+            leading: const Icon(Icons.password_outlined),
+            title: const Text('كلمة المرور'),
+            subtitle: const Text('تغيير كلمة مرور HaiChat'),
+            onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AccountSetupScreen(isEdit: true))),
           ),
           ListTile(
             leading: const Icon(Icons.email_outlined),

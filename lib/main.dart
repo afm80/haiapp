@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'account_setup_screen.dart';
 import 'app_colors.dart';
 import 'app_prefs.dart';
 import 'auth_screen.dart';
@@ -190,7 +191,10 @@ class _ProfileGateState extends State<ProfileGate> {
         final d = snap.data!.data();
         final hasName = (d?['name'] ?? '').toString().trim().isNotEmpty;
         final hasPhone = (d?['phone'] ?? '').toString().trim().isNotEmpty;
-        return (hasName && hasPhone) ? const HomeScreen() : const ProfileSetupScreen();
+        if (!(hasName && hasPhone)) return const ProfileSetupScreen();
+        final hasUser = (d?['username'] ?? '').toString().trim().isNotEmpty;
+        final hasPass = d?['hasPassword'] == true;
+        return (hasUser && hasPass) ? const HomeScreen() : const AccountSetupScreen();
       },
     );
   }

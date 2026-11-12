@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'app_colors.dart';
+import 'auth_api.dart';
 import 'google_config.dart';
 
 /// شاشة واحدة: ترحيب + الموافقة + الدخول بحساب Google.
@@ -19,6 +20,56 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   bool _loading = false;
   String? _error;
+  String? _info;
+  bool _showForm = false;
+  bool _hide = true;
+  final _id = TextEditingController();
+  final _pass = TextEditingController();
+
+  Future<void> _passwordLogin() async {
+    if (_id.text.trim().isEmpty || _pass.text.isEmpty) {
+      setState(() => _error = 'اكتب الرقم أو اليوزرنيم وكلمة المرور');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+      _info = null;
+    });
+    try {
+      await loginWithPassword(_id.text, _pass.text);
+    } on AuthApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'صار خطأ، حاول مرة ثانية');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _forgot() async {
+    if (_id.text.trim().isEmpty) {
+      setState(() => _error = 'اكتب الرقم أو اليوزرنيم أولاً');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+      _info = null;
+    });
+    try {
+      final hint = await requestReset(_id.text);
+      if (mounted) {
+        setState(() => _info = hint.isEmpty
+            ? 'إن كان الحساب موجوداً أرسلنا رابط الاستعادة إلى إيميل Google المرتبط به'
+            : 'أرسلنا رابط الاستعادة إلى $hint');
+      }
+    } on AuthApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   /// يرجع false إذا ألغى المستخدم
   Future<bool> _native() async {
@@ -72,6 +123,14 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  InputDecoration _dec(String label) => InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white70),
+        enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
+        focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white)),
+        border: const OutlineInputBorder(),
+      );
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
@@ -86,6 +145,10 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ),
         child: SafeArea(
+        child: LayoutBuilder(builder: (context, cons) => SingleChildScrollView(
+         child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: cons.maxHeight),
+          child: IntrinsicHeight(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -104,6 +167,12 @@ class _AuthScreenState extends State<AuthScreen> {
                   textAlign: TextAlign.center,
                   style: t.bodyLarge?.copyWith(color: Colors.white70)),
               const Spacer(),
+              if (_info != null) ...[
+                Text(_info!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white)),
+                const SizedBox(height: 12),
+              ],
               if (_error != null) ...[
                 SelectableText(_error!,
                     textAlign: TextAlign.center,
@@ -132,10 +201,61 @@ class _AuthScreenState extends State<AuthScreen> {
                   label: const Text('الموافقة والمتابعة بحساب Google'),
                 ),
               ),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: () => setState(() => _showForm = !_showForm),
+                child: Text(_showForm ? 'إخفاء' : 'الدخول باليوزرنيم أو رقم الموبايل',
+                    style: const TextStyle(color: Colors.white)),
+              ),
+              if (_showForm) ...[
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: TextField(
+                    controller: _id,
+                    style: const TextStyle(color: Colors.white),
+                    autocorrect: false,
+                    decoration: _dec('رقم الموبايل أو اليوزرنيم'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _pass,
+                  obscureText: _hide,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _dec('كلمة المرور').copyWith(
+                    suffixIcon: IconButton(
+                      icon: Icon(_hide ? Icons.visibility_off : Icons.visibility,
+                          color: Colors.white70),
+                      onPressed: () => setState(() => _hide = !_hide),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white54),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: _loading ? null : _passwordLogin,
+                    child: const Text('دخول'),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _loading ? null : _forgot,
+                  child: const Text('نسيت كلمة المرور؟',
+                      style: TextStyle(color: Colors.white70)),
+                ),
+              ],
             ],
           ),
         ),
-      ),
+          ),
+         ),
+        )),
+       ),
       ),
     );
   }
