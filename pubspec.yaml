@@ -29,6 +29,7 @@ dependencies:
   google_sign_in: ^6.2.2
   photo_manager: ^3.5.0
   gal: ^2.3.0
+  local_auth: ^2.3.0
   share_plus: ^10.1.4
 
 dev_dependencies:
