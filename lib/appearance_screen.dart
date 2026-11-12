@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'app_colors.dart';
 import 'chat_wallpaper.dart';
@@ -15,6 +18,20 @@ class AppearanceScreen extends StatelessWidget {
     } catch (_) {}
   }
 
+  Future<void> _fromDevice(BuildContext context) async {
+    final m = ScaffoldMessenger.of(context);
+    try {
+      final x = await ImagePicker().pickImage(
+          source: ImageSource.gallery, maxWidth: 1280, maxHeight: 1280, imageQuality: 75);
+      if (x == null) return;
+      await saveCustomWallpaper(await x.readAsBytes());
+      await _pick('custom');
+      m.showSnackBar(const SnackBar(content: Text('تم تغيير الخلفية')));
+    } catch (_) {
+      m.showSnackBar(const SnackBar(content: Text('تعذر اختيار الصورة')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
@@ -29,6 +46,39 @@ class AppearanceScreen extends StatelessWidget {
           crossAxisSpacing: 14,
           childAspectRatio: 0.8,
           children: [
+            ValueListenableBuilder<String?>(
+              valueListenable: customWallpaperPath,
+              builder: (context, path, _) => GestureDetector(
+                onTap: () => _fromDevice(context),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: Colors.black12,
+                          border: Border.all(
+                              color: current == 'custom' ? AppColors.accent : Colors.transparent,
+                              width: 3),
+                          image: (path != null && File(path).existsSync())
+                              ? DecorationImage(image: FileImage(File(path)), fit: BoxFit.cover)
+                              : null,
+                        ),
+                        child: Center(
+                          child: Icon(Icons.add_photo_alternate_outlined,
+                              size: 36,
+                              color: (path != null && File(path).existsSync())
+                                  ? Colors.white
+                                  : Theme.of(context).hintColor),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text('من جهازك'),
+                  ],
+                ),
+              ),
+            ),
             for (final e in kWallpapers.entries)
               GestureDetector(
                 onTap: () => _pick(e.key),

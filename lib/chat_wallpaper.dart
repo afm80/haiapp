@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// خيارات الخلفية: المعرّف -> الاسم
 const kWallpapers = <String, String>{
@@ -11,8 +13,40 @@ const kWallpapers = <String, String>{
   'mint': 'أخضر هادئ',
 };
 
-/// الخلفية المختارة (تُحمَّل من حساب المستخدم)
+/// الخلفية المختارة (تُحمَّل من حساب المستخدم). 'custom' = صورة من جهازك
 final ValueNotifier<String> wallpaperPref = ValueNotifier<String>('flowers');
+
+/// مسار الصورة المختارة من الجهاز (محفوظة على هذا الجهاز فقط)
+final ValueNotifier<String?> customWallpaperPath = ValueNotifier<String?>(null);
+
+/// يبحث عن آخر صورة خلفية محفوظة على هذا الجهاز
+Future<void> loadCustomWallpaper() async {
+  try {
+    final dir = await getApplicationDocumentsDirectory();
+    final files = dir
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.uri.pathSegments.last.startsWith('chat_bg_'))
+        .toList()
+      ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+    customWallpaperPath.value = files.isEmpty ? null : files.first.path;
+  } catch (_) {}
+}
+
+/// يحفظ صورة جديدة كخلفية ويحذف القديمة
+Future<void> saveCustomWallpaper(List<int> bytes) async {
+  final dir = await getApplicationDocumentsDirectory();
+  for (final f in dir.listSync().whereType<File>()) {
+    if (f.uri.pathSegments.last.startsWith('chat_bg_')) {
+      try {
+        f.deleteSync();
+      } catch (_) {}
+    }
+  }
+  final f = File('${dir.path}/chat_bg_${DateTime.now().millisecondsSinceEpoch}.jpg');
+  await f.writeAsBytes(bytes);
+  customWallpaperPath.value = f.path;
+}
 
 /// ألوان تدرّج الخلفية (أعلى، أسفل) حسب الخيار والوضع
 List<Color> wallpaperColors(String id, bool dark) {
@@ -46,14 +80,27 @@ class ChatWallpaper extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<String>(
       valueListenable: wallpaperPref,
-      builder: (_, id, __) => Stack(children: [
-        Positioned.fill(
-          child: RepaintBoundary(
-            child: CustomPaint(painter: _PatternPainter(dark, id)),
-          ),
-        ),
-        child,
-      ]),
+      builder: (_, id, __) => ValueListenableBuilder<String?>(
+        valueListenable: customWallpaperPath,
+        builder: (_, path, __) {
+          final useImage = id == 'custom' && path != null && File(path).existsSync();
+          return Stack(children: [
+            Positioned.fill(
+              child: RepaintBoundary(
+                child: CustomPaint(painter: _PatternPainter(dark, useImage ? 'plain' : (id == 'custom' ? 'flowers' : id))),
+              ),
+            ),
+            if (useImage) ...[
+              Positioned.fill(child: Image.file(File(path), fit: BoxFit.cover)),
+              // طبقة تعتيم خفيفة حتى تبقى الرسائل مقروءة
+              Positioned.fill(
+                child: ColoredBox(color: Colors.black.withAlpha(dark ? 120 : 28)),
+              ),
+            ],
+            child,
+          ]);
+        },
+      ),
     );
   }
 }

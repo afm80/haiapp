@@ -59,6 +59,11 @@ class _HomeScreenState extends State<HomeScreen>
     unawaited(fs.collection('users').doc(currentUser.uid).get().then((d) {
       final w = (d.data()?['wallpaper'] ?? '').toString();
       if (kWallpapers.containsKey(w)) wallpaperPref.value = w;
+      if (w == 'custom') {
+        loadCustomWallpaper().then((_) {
+          if (customWallpaperPath.value != null) wallpaperPref.value = 'custom';
+        });
+      }
       themeModePref.value = themeModeFromString((d.data()?['themeMode'] ?? '').toString());
       if (d.data()?['appLock'] == true && mounted) {
         setState(() {
