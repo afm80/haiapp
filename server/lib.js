@@ -240,4 +240,4 @@ async function notify(env, authHeader, body) {
   }
 }
 
-module.exports = { DEFAULT_APP_ID, TOKEN_SECONDS, buildRtcToken, verifyFirebase, notify };
+module.exports = { DEFAULT_APP_ID, TOKEN_SECONDS, buildRtcToken, verifyFirebase, notify, tf, googleToken, fsGet, b64u, pemToBytes };
