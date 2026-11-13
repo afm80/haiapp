@@ -363,7 +363,7 @@ class _StatusTabState extends State<StatusTab> {
             if (allOthers.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(32),
-                child: Center(child: Text('ما فيه تحديثات حالة من الآخرين الآن')),
+                child: Center(child: Text('لا توجد تحديثات حالة من الآخرين الآن')),
               ),
           ],
         );
