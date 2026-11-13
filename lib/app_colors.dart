@@ -17,7 +17,7 @@ class AppColors {
   static const mineLight = Color(0xFFF7DCE7);
   static const mineDark = Color(0xFF6B1A3C);
   static const otherLight = Colors.white;
-  static const otherDark = Color(0xFF262B36);
+  static const otherDark = Color(0xFF323948);
 
   static const statusColors = <Color>[
     Color(0xFFA61E4E),

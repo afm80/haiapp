@@ -122,7 +122,7 @@ class _PatternPainter extends CustomPainter {
             colors: wallpaperColors(style, dark),
           ).createShader(rect));
     if (style != 'flowers') return;
-    final ink = dark ? const Color(0xFF2E3544) : const Color(0xFFD3D0CA);
+    final ink = dark ? const Color(0xFF242A37) : const Color(0xFFDDDAD5);
     final p = Paint()
       ..color = ink
       ..style = PaintingStyle.stroke

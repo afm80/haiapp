@@ -90,9 +90,11 @@ class SettingsScreen extends StatelessWidget {
                 title: const Text('رقم الموبايل'),
                 onTap: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const ChangePhoneScreen())),
-                subtitle: Directionality(
-                    textDirection: TextDirection.ltr,
-                    child: Text((u['phone'] ?? '').toString(), textAlign: TextAlign.start)),
+                subtitle: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Text((u['phone'] ?? '').toString()))),
                 trailing: verified
                     ? const Tooltip(
                         message: 'موثّق',
@@ -118,9 +120,10 @@ class SettingsScreen extends StatelessWidget {
                 title: const Text('اسم المستخدم'),
                 subtitle: un.isEmpty
                     ? const Text('غير محدد، أضف اسماً ليجدك الناس بدون رقمك')
-                    : Directionality(
-                        textDirection: TextDirection.ltr,
-                        child: Text('@$un', textAlign: TextAlign.start)),
+                    : Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Directionality(
+                            textDirection: TextDirection.ltr, child: Text('@$un'))),
                 onTap: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const UsernameScreen())),
               );

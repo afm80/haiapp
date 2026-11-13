@@ -40,16 +40,35 @@ class _CallsTabState extends State<CallsTab> {
                 textAlign: TextAlign.center),
           ));
         }
-        final shown = docs.take(60).toList();
+        // نجمع المكالمات المتتالية المتشابهة (نفس الشخص والاتجاه والحالة) في صف واحد
+        final groups = <(Map<String, dynamic>, int)>[];
+        String? lastKey;
+        for (final doc in docs.take(80)) {
+          final d = doc.data();
+          final key = _key(d);
+          if (key == lastKey && groups.isNotEmpty) {
+            groups[groups.length - 1] = (groups.last.$1, groups.last.$2 + 1);
+          } else {
+            groups.add((d, 1));
+            lastKey = key;
+          }
+        }
         return ListView.builder(
-          itemCount: shown.length,
-          itemBuilder: (context, i) => _tile(context, shown[i].data()),
+          itemCount: groups.length,
+          itemBuilder: (context, i) => _tile(context, groups[i].$1, groups[i].$2),
         );
       },
     );
   }
 
-  Widget _tile(BuildContext context, Map<String, dynamic> d) {
+  String _key(Map<String, dynamic> d) {
+    final outgoing = d['callerId'] == currentUser.uid;
+    final callees = List<String>.from(d['calleeIds'] ?? const []);
+    final other = outgoing ? callees.join(',') : (d['callerId'] ?? '').toString();
+    return '$outgoing|$other|${d['status'] == 'answered'}|${d['type']}';
+  }
+
+  Widget _tile(BuildContext context, Map<String, dynamic> d, int count) {
     final uid = currentUser.uid;
     final outgoing = d['callerId'] == uid;
     final video = d['type'] == 'video';
@@ -79,7 +98,7 @@ class _CallsTabState extends State<CallsTab> {
                   : ((outgoing ? d['title'] : d['callerName']) ?? '').toString());
           return ListTile(
             leading: Avatar(photo: u['photo'] as String?, name: name, radius: 26),
-            title: Text(name,
+            title: Text(count > 1 ? '$name ($count)' : name,
                 style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: missed ? Theme.of(context).colorScheme.error : null)),
@@ -91,7 +110,7 @@ class _CallsTabState extends State<CallsTab> {
               ],
             ),
             trailing: IconButton(
-              icon: Icon(video ? Icons.videocam : Icons.call, color: AppColors.primary),
+              icon: Icon(video ? Icons.videocam : Icons.call, color: AppColors.accent),
               onPressed: () {
                 final targets = outgoing ? callees : [otherId];
                 startCall(context, calleeIds: targets, title: name, video: video);
