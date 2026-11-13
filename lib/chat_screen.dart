@@ -859,14 +859,16 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     } else {
       // الوقت وعلامات القراءة في سطر مستقل أسفل النص
-      body = Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(data['text'] ?? '', style: const TextStyle(fontSize: 16, height: 1.3)),
-          const SizedBox(height: 3),
-          Align(alignment: AlignmentDirectional.centerEnd, child: meta()),
-        ],
+      body = IntrinsicWidth(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(data['text'] ?? '', style: const TextStyle(fontSize: 16, height: 1.3)),
+            const SizedBox(height: 3),
+            Align(alignment: AlignmentDirectional.centerEnd, child: meta()),
+          ],
+        ),
       );
     }
 
