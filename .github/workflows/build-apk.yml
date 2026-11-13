@@ -54,7 +54,7 @@ jobs:
           EOF
 
       - name: بناء APK
-        run: flutter build apk --release --target-platform android-arm64
+        run: flutter build apk --release --target-platform android-arm,android-arm64
 
       - name: تسمية الملف باسم التطبيق
         run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/HaiChat.apk
