@@ -858,26 +858,26 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       );
     } else {
-      body = Wrap(
-        alignment: WrapAlignment.end,
-        crossAxisAlignment: WrapCrossAlignment.end,
+      // الوقت وعلامات القراءة في سطر مستقل أسفل النص
+      body = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(data['text'] ?? '', style: const TextStyle(fontSize: 16, height: 1.3)),
-          Padding(
-            padding: const EdgeInsetsDirectional.only(start: 10, top: 4),
-            child: meta(),
-          ),
+          const SizedBox(height: 3),
+          Align(alignment: AlignmentDirectional.centerEnd, child: meta()),
         ],
       );
     }
 
-    const r = Radius.circular(12);
-    // (مثل واتساب العربي) رسائلي على اليسار والواردة على اليمين
+    // شكل HaiChat: زوايا مستديرة كبيرة وزاوية سفلية صغيرة تدل على المرسل
+    const r = Radius.circular(20);
+    const small = Radius.circular(6);
     final shape = BorderRadius.only(
-      topLeft: (tail && mine) ? Radius.zero : r,
-      topRight: (tail && !mine) ? Radius.zero : r,
-      bottomLeft: r,
-      bottomRight: r,
+      topLeft: r,
+      topRight: r,
+      bottomLeft: (tail && mine) ? small : r,
+      bottomRight: (tail && !mine) ? small : r,
     );
     final rtl = Directionality.of(context) == TextDirection.rtl;
 
@@ -887,15 +887,24 @@ class _ChatScreenState extends State<ChatScreen> {
         margin: EdgeInsets.only(top: tail ? 6 : 1.5, bottom: 1.5),
         padding: isImage
             ? const EdgeInsets.all(3)
-            : const EdgeInsetsDirectional.fromSTEB(9, 6, 9, 5),
+            : const EdgeInsetsDirectional.fromSTEB(12, 7, 12, 5),
         constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.8, minWidth: isAudio ? 240 : 0),
         decoration: BoxDecoration(
           color: isSticker
               ? Colors.transparent
               : mine
-                  ? (dark ? AppColors.mineDark : AppColors.mineLight)
+                  ? (dark ? null : AppColors.mineLight)
                   : (dark ? AppColors.otherDark : AppColors.otherLight),
+          gradient: (mine && dark && !isSticker)
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF9A1B4A), Color(0xFF6B0F36)])
+              : null,
+          border: (!mine && dark && !isSticker)
+              ? Border.all(color: const Color(0xFF4A2B3B), width: 1)
+              : null,
           borderRadius: shape,
           boxShadow: (dark || isSticker)
               ? null
