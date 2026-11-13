@@ -902,8 +902,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   end: Alignment.bottomRight,
                   colors: [Color(0xFF9A1B4A), Color(0xFF6B0F36)])
               : null,
-          border: (!mine && dark && !isSticker)
-              ? Border.all(color: const Color(0xFF4A2B3B), width: 1)
+          border: (!mine && !isSticker)
+              ? Border.all(color: dark ? const Color(0xFF4A2B3B) : const Color(0xFFDCCBD3), width: 1)
               : null,
           borderRadius: shape,
           boxShadow: (dark || isSticker)
